@@ -1,0 +1,2357 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DENTRA - السجل السريري لطلاب طب الأسنان</title>
+    <!-- PWA Manifest Inline Data -->
+    <link rel="manifest" href="data:application/json;base64,ewogICJzaG9ydF9uYW1lIjogIkRFTlRSQSIsCiAgIm5hbWUiOiAiREVOVFJBIC0gQ2xpbmljYWwgUmVjb3JkIiwKICAic3RhcnRfdXJsIjogIi4iLAogICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLAogICJiYWNrZ3JvdW5kX2NvbG9yIjogIiNmOGZhdmMiLAogICJ0aGVtZV9jb2xvciI6ICIjMGY3NjZlIgp9">
+    <!-- Tailwind CSS & Lucide Icons -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Firebase (Auth + Firestore + Analytics) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics-compat.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap');
+        body { font-family: 'Cairo', sans-serif; }
+        
+        .tooth-surface { transition: all 0.2s ease; cursor: pointer; fill: #ffffff; stroke: #4b5563; stroke-width: 1.5; }
+        .tooth-surface:hover { fill: #e5e7eb; }
+        .status-caries { fill: #ef4444 !important; }
+        .status-filled { fill: #3b82f6 !important; }
+        .status-endo { fill: #10b981 !important; }
+        .status-extracted { fill: #1f2937 !important; opacity: 0.2; }
+
+        @media print {
+            header, nav, .no-print, button { display: none !important; }
+            body { background: white !important; padding: 0 !important; }
+            main { max-width: 100% !important; width: 100% !important; margin: 0 !important; }
+            .print-only { display: block !important; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col pb-12">
+
+    <!-- AUTH CHECK LOADER (يظهر لحظياً أثناء تحقق Firebase من وجود جلسة محفوظة) -->
+    <div id="authLoading" class="min-h-screen flex items-center justify-center p-4">
+        <div class="text-center space-y-3">
+            <p id="authLoadingText" class="text-sm text-slate-400">جارٍ التحقق من الحساب...</p>
+            <button id="authLoadingRetryBtn" onclick="location.reload()" class="hidden px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-semibold">إعادة المحاولة</button>
+        </div>
+    </div>
+
+    <!-- AUTH SCREEN (تسجيل الدخول / إنشاء حساب) -->
+    <div id="authScreen" class="hidden min-h-screen flex items-center justify-center p-4 bg-slate-50">
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 w-full max-w-md p-6 space-y-5">
+            <div class="text-center space-y-1">
+                <div class="w-12 h-12 rounded-xl bg-teal-700 text-white flex items-center justify-center text-xl font-bold mx-auto">D</div>
+                <h1 class="text-lg font-bold text-slate-800">DENTRA</h1>
+                <p class="text-xs text-slate-500">السجل السريري لطلاب طب الأسنان</p>
+            </div>
+
+            <!-- LOGIN FORM -->
+            <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">البريد الإلكتروني</label>
+                    <input type="email" id="loginEmail" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">كلمة المرور</label>
+                    <input type="password" id="loginPassword" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                </div>
+                <p id="loginError" class="text-xs text-rose-600 min-h-[16px]"></p>
+                <button type="submit" id="loginSubmitBtn" class="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-semibold shadow">تسجيل الدخول</button>
+                <p class="text-xs text-center text-slate-500">ليس لديك حساب؟ <button type="button" onclick="showSignupForm()" class="text-teal-600 font-semibold hover:underline">إنشاء حساب جديد</button></p>
+            </form>
+
+            <!-- SIGNUP FORM -->
+            <form id="signupForm" onsubmit="handleSignup(event)" class="space-y-3 hidden">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">البريد الإلكتروني *</label>
+                    <input type="email" id="suEmail" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">كلمة المرور * (6 أحرف على الأقل)</label>
+                    <input type="password" id="suPassword" required minlength="6" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">اسم الطالب الكامل *</label>
+                    <input type="text" id="suName" required placeholder="د. أحمد علي" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">الجامعة *</label>
+                    <select id="suUniversity" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                        <option value="جامعة دمشق">جامعة دمشق</option>
+                        <option value="جامعة اللاذقية">جامعة اللاذقية</option>
+                        <option value="جامعة حلب">جامعة حلب</option>
+                        <option value="جامعة حمص">جامعة حمص</option>
+                        <option value="جامعة طرطوس">جامعة طرطوس</option>
+                        <option value="جامعة حماة">جامعة حماة</option>
+                        <option value="جامعة خاصة">جامعة خاصة</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">السنة الدراسية *</label>
+                    <select id="suYear" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                        <option value="أولى">السنة الأولى</option>
+                        <option value="ثانية">السنة الثانية</option>
+                        <option value="ثالثة">السنة الثالثة</option>
+                        <option value="رابعة">السنة الرابعة</option>
+                        <option value="خامسة">السنة الخامسة</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">رقم الهاتف *</label>
+                    <input type="tel" id="suPhone" required placeholder="09xxxxxxxx" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                </div>
+                <p id="signupError" class="text-xs text-rose-600 min-h-[16px]"></p>
+                <button type="submit" id="signupSubmitBtn" class="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-semibold shadow">إنشاء الحساب والبدء</button>
+                <p class="text-xs text-center text-slate-500">لديك حساب مسبقاً؟ <button type="button" onclick="showLoginForm()" class="text-teal-600 font-semibold hover:underline">تسجيل الدخول</button></p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Header Navigation -->
+    <header class="hidden bg-teal-700 text-white shadow-lg sticky top-0 z-50 no-print">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-3 space-x-reverse cursor-pointer" onclick="switchTab('home')">
+                <i data-lucide="activity" class="w-8 h-8 text-teal-200"></i>
+                <h1 class="text-2xl font-bold tracking-wide">DENTRA <span class="text-xs font-normal bg-teal-800 px-2 py-1 rounded">Clinical</span></h1>
+            </div>
+            <nav class="flex gap-1.5 md:gap-2 overflow-x-auto">
+                <button onclick="switchTab('home')" id="tab-home" class="px-3 py-2 rounded-lg text-sm font-semibold transition bg-teal-800 text-white flex items-center gap-1.5 whitespace-nowrap">
+                    <i data-lucide="home" class="w-4 h-4"></i> الرئيسية
+                </button>
+                <button onclick="switchTab('patients')" id="tab-patients" class="px-3 py-2 rounded-lg text-sm font-semibold transition hover:bg-teal-600 text-teal-100 flex items-center gap-1.5 whitespace-nowrap">
+                    <i data-lucide="users" class="w-4 h-4"></i> المرضى
+                </button>
+                <button onclick="switchTab('cases')" id="tab-cases" class="px-3 py-2 rounded-lg text-sm font-semibold transition hover:bg-teal-600 text-teal-100 flex items-center gap-1.5 whitespace-nowrap">
+                    <i data-lucide="folder-kanban" class="w-4 h-4"></i> الحالات
+                </button>
+                <button onclick="switchTab('requirements')" id="tab-requirements" class="px-3 py-2 rounded-lg text-sm font-semibold transition hover:bg-teal-600 text-teal-100 flex items-center gap-1.5 whitespace-nowrap">
+                    <i data-lucide="check-square" class="w-4 h-4"></i> المتطلبات
+                </button>
+                <button onclick="switchTab('schedule')" id="tab-schedule" class="px-3 py-2 rounded-lg text-sm font-semibold transition hover:bg-teal-600 text-teal-100 flex items-center gap-1.5 whitespace-nowrap">
+                    <i data-lucide="calendar" class="w-4 h-4"></i> المواعيد
+                </button>
+                <button onclick="switchTab('profile')" id="tab-profile" class="px-3 py-2 rounded-lg text-sm font-semibold transition hover:bg-teal-600 text-teal-100 flex items-center gap-1.5 whitespace-nowrap">
+                    <i data-lucide="user" class="w-4 h-4"></i> الملف الشخصي
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="hidden max-w-7xl mx-auto px-4 py-6 flex-grow w-full">
+
+        <!-- HOME DASHBOARD VIEW -->
+        <section id="view-home" class="space-y-6">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800" id="welcomeStudentName">أهلاً بك، دكتور</h2>
+                    <p class="text-xs text-teal-600 font-semibold mt-0.5" id="welcomeUniversity">جامعة دمشق</p>
+                </div>
+                <div class="w-full md:w-64 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    <div class="flex justify-between items-center text-xs font-semibold text-slate-600 mb-1.5">
+                        <span>إنجاز المتطلبات الكلي</span>
+                        <span id="progressPercentText">0%</span>
+                    </div>
+                    <div class="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
+                        <div id="progressBarFill" class="bg-teal-600 h-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-3">
+                <h3 class="font-bold text-slate-800 flex items-center gap-2 border-b pb-2">
+                    <i data-lucide="calendar-check" class="w-5 h-5 text-teal-600"></i> جدول اليوم
+                </h3>
+                <div id="homeTodayAppointments" class="space-y-2"></div>
+            </div>
+
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-3">
+                <div class="flex justify-between items-center border-b pb-2">
+                    <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                        <i data-lucide="sticky-note" class="w-5 h-5 text-amber-500"></i> ملاحظات هامة
+                    </h3>
+                    <button onclick="saveQuickNotes()" class="text-xs text-teal-600 font-semibold hover:underline">حفظ الملاحظات</button>
+                </div>
+                <textarea id="homeQuickNotes" placeholder="اكتب هنا تذكيرات للعيادة القادمة، أدوات تود شراءها، أو تعليمات مشرف..." class="w-full border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 min-h-[90px]"></textarea>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
+                <button onclick="openPatientModal()" class="bg-teal-600 hover:bg-teal-700 text-white p-4 rounded-xl shadow transition flex flex-col items-center justify-center gap-2 text-sm font-semibold">
+                    <i data-lucide="user-plus" class="w-6 h-6"></i> إضافة مريض
+                </button>
+                <button onclick="openCaseModal()" class="bg-teal-600 hover:bg-teal-700 text-white p-4 rounded-xl shadow transition flex flex-col items-center justify-center gap-2 text-sm font-semibold">
+                    <i data-lucide="folder-plus" class="w-6 h-6"></i> إضافة حالة
+                </button>
+                <button onclick="openAppointmentModal()" class="bg-teal-600 hover:bg-teal-700 text-white p-4 rounded-xl shadow transition flex flex-col items-center justify-center gap-2 text-sm font-semibold">
+                    <i data-lucide="calendar-plus" class="w-6 h-6"></i> حجز موعد
+                </button>
+                <button onclick="switchTab('requirements')" class="bg-teal-800 hover:bg-teal-900 text-white p-4 rounded-xl shadow transition flex flex-col items-center justify-center gap-2 text-sm font-semibold">
+                    <i data-lucide="check-square" class="w-6 h-6"></i> متابعة المتطلبات
+                </button>
+            </div>
+        </section>
+
+        <!-- PATIENTS VIEW -->
+        <section id="view-patients" class="hidden space-y-6">
+            <div class="flex flex-col md:flex-row justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                <div class="flex gap-3 flex-grow">
+                    <div class="relative flex-grow">
+                        <i data-lucide="search" class="w-5 h-5 absolute right-3 top-2.5 text-slate-400"></i>
+                        <input type="text" id="searchInput" oninput="renderPatients()" placeholder="البحث باسم المريض أو رقم الهاتف..." class="w-full pr-10 pl-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
+                    </div>
+                    <select id="filterSubject" onchange="renderPatients()" class="border rounded-lg px-3 py-2 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-500">
+                        <option value="ALL">جميع المواد السريرية</option>
+                        <option value="مداواة ترميمية">مداواة ترميمية</option>
+                        <option value="مداواة لبية">مداواة لبية</option>
+                        <option value="تعويضات ثابتة">تعويضات ثابتة</option>
+                        <option value="تعويضات متحركة">تعويضات متحركة</option>
+                        <option value="تخدير وقلع">تخدير وقلع</option>
+                        <option value="أمراض اللثة">أمراض اللثة</option>
+                        <option value="أمراض الفم">أمراض الفم</option>
+                        <option value="أطفال">أطفال</option>
+                    </select>
+                </div>
+                <button onclick="openPatientModal()" class="bg-teal-600 hover:bg-teal-700 text-white px-5 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition shadow">
+                    <i data-lucide="user-plus" class="w-4 h-4"></i> إضافة مريض جديد
+                </button>
+            </div>
+            <div id="patientList" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+        </section>
+
+        <!-- CLINICAL CASES VIEW -->
+        <section id="view-cases" class="hidden space-y-6">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-800">إدارة الحالات السريرية</h2>
+                    <p class="text-xs text-slate-500">متابعة الخطط العلاجية والتخصصات الأكاديمية</p>
+                </div>
+                <div class="flex gap-3 w-full md:w-auto justify-end">
+                    <select id="filterCaseStatus" onchange="renderCases()" class="border rounded-lg px-3 py-2 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-500">
+                        <option value="ALL">جميع الحالات</option>
+                        <option value="مخططة">مخططة</option>
+                        <option value="قيد المعالجة">قيد المعالجة</option>
+                        <option value="مكتملة">مكتملة</option>
+                        <option value="ملغاة">ملغاة</option>
+                    </select>
+                    <button onclick="openCaseModal()" class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 shadow">
+                        <i data-lucide="folder-plus" class="w-4 h-4"></i> إضافة حالة جديدة
+                    </button>
+                </div>
+            </div>
+            <div id="casesList" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+        </section>
+
+        <!-- REQUIREMENTS COUNTER VIEW -->
+        <section id="view-requirements" class="hidden space-y-6">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-2">
+                <h2 class="text-xl font-bold text-slate-800">متابعة المتطلبات السريرية الأكاديمية</h2>
+                <p class="text-xs text-slate-500">يمكنك هنا تحديد الهدف المطلوب لكل مادة وزيادة المنجز بنقرة واحدة لضمان استيفاء المتطلبات.</p>
+            </div>
+            <div id="requirementsList" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+        </section>
+
+        <!-- SCHEDULE VIEW -->
+        <section id="view-schedule" class="hidden space-y-6">
+            <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-800">جدول المواعيد السريرية</h2>
+                    <p class="text-xs text-slate-500">متابعة مواعيد العيادات والاحتياجات اليومية</p>
+                </div>
+                <button onclick="openAppointmentModal()" class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2">
+                    <i data-lucide="plus-circle" class="w-4 h-4"></i> حجز موعد جديد
+                </button>
+            </div>
+            <div class="grid lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-1 bg-teal-50 border border-teal-200 p-4 rounded-xl">
+                    <h3 class="font-bold text-teal-800 mb-3 flex items-center gap-2">
+                        <i data-lucide="clock" class="w-5 h-5"></i> مواعيد اليوم
+                    </h3>
+                    <div id="todayAppointmentsList" class="space-y-3"></div>
+                </div>
+                <div class="lg:col-span-2 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                    <h3 class="font-bold text-slate-800 mb-3 border-b pb-2">جميع المواعيد القادمة</h3>
+                    <div id="allAppointmentsList" class="divide-y divide-slate-100"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- PROFILE & BACKUP VIEW -->
+        <section id="view-profile" class="hidden space-y-6">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-2xl mx-auto space-y-6">
+                <div class="flex justify-between items-center border-b pb-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800">الملف الشخصي للطالب</h2>
+                        <p class="text-xs text-slate-500">بيانات الحساب الجامعي المسجلة</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="openProfileEditModal()" class="bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5">
+                            <i data-lucide="edit-3" class="w-4 h-4"></i> تعديل البيانات
+                        </button>
+                        <button onclick="handleLogout()" class="bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5">
+                            <i data-lucide="log-out" class="w-4 h-4"></i> تسجيل الخروج
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid md:grid-cols-2 gap-4 text-sm">
+                    <div class="bg-slate-50 p-3.5 rounded-lg border">
+                        <span class="text-xs text-slate-400 block mb-0.5">البريد الإلكتروني المربوط</span>
+                        <span id="profEmail" class="font-semibold text-slate-800">-</span>
+                    </div>
+                    <div class="bg-slate-50 p-3.5 rounded-lg border">
+                        <span class="text-xs text-slate-400 block mb-0.5">اسم الطالب</span>
+                        <span id="profName" class="font-semibold text-slate-800">-</span>
+                    </div>
+                    <div class="bg-slate-50 p-3.5 rounded-lg border">
+                        <span class="text-xs text-slate-400 block mb-0.5">الجامعة</span>
+                        <span id="profUniversity" class="font-semibold text-slate-800">-</span>
+                    </div>
+                    <div class="bg-slate-50 p-3.5 rounded-lg border">
+                        <span class="text-xs text-slate-400 block mb-0.5">السنة الدراسية</span>
+                        <span id="profYear" class="font-semibold text-slate-800">-</span>
+                    </div>
+                    <div class="bg-slate-50 p-3.5 rounded-lg border md:col-span-2">
+                        <span class="text-xs text-slate-400 block mb-0.5">رقم الهاتف</span>
+                        <span id="profPhone" class="font-semibold text-slate-800">-</span>
+                    </div>
+                </div>
+
+                <!-- License / Subscription Status -->
+                <div class="border-t pt-5 space-y-2">
+                    <h3 class="font-bold text-slate-800 text-sm">حالة الاشتراك</h3>
+                    <div id="licenseStatusBox" class="bg-slate-50 p-3.5 rounded-lg border text-sm"></div>
+                </div>
+
+                <!-- Backup & Import Management -->
+                <div class="border-t pt-5 space-y-3">
+                    <h3 class="font-bold text-slate-800 text-sm">إدارة النسخ الاحتياطي للبيانات</h3>
+                    <p class="text-xs text-slate-500">قم بتصدير ملف احتياطي لحفظ بياناتك في مكان آمن أو نقلها لحاسوب/هاتف آخر.</p>
+                    <div class="flex gap-3 pt-1">
+                        <button onclick="exportDataBackup()" class="flex-1 bg-slate-800 hover:bg-slate-900 text-white py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 shadow">
+                            <i data-lucide="download" class="w-4 h-4"></i> تصدير البيانات (JSON)
+                        </button>
+                        <label class="flex-1 bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer text-center">
+                            <i data-lucide="upload" class="w-4 h-4"></i> استرجاع نسخة احتياطية
+                            <input type="file" accept=".json" onchange="importDataBackup(event)" class="hidden">
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ODONTOGRAM VIEW -->
+        <section id="view-odontogram" class="hidden space-y-6">
+            <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                <div class="flex items-center gap-3">
+                    <button onclick="switchTab('patients')" class="text-slate-500 hover:text-slate-800 border p-1.5 rounded-lg no-print">
+                        <i data-lucide="arrow-right" class="w-5 h-5"></i>
+                    </button>
+                    <div>
+                        <h2 id="activePatientName" class="text-xl font-bold text-slate-800">اسم المريض</h2>
+                        <p id="activePatientMeta" class="text-xs text-slate-500">العمر | المادة السريرية</p>
+                    </div>
+                </div>
+                <button onclick="handlePrintClick()" class="bg-slate-800 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 no-print">
+                    <i data-lucide="printer" class="w-4 h-4"></i> طباعة التقرير (PDF)
+                </button>
+            </div>
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3 no-print">
+                <span class="text-xs font-bold text-slate-500 block">حدد الحالة ثم انقر على سطح السن لتطبيقه:</span>
+                <div class="flex flex-wrap gap-3 text-sm">
+                    <label class="flex items-center gap-2 cursor-pointer border px-3 py-1.5 rounded-lg hover:bg-slate-50"><input type="radio" name="toolStatus" value="caries" checked class="accent-red-500"><span class="w-3 h-3 rounded-full bg-red-500 inline-block"></span> نخر / تسوس</label>
+                    <label class="flex items-center gap-2 cursor-pointer border px-3 py-1.5 rounded-lg hover:bg-slate-50"><input type="radio" name="toolStatus" value="filled" class="accent-blue-500"><span class="w-3 h-3 rounded-full bg-blue-500 inline-block"></span> معالج / حشوة</label>
+                    <label class="flex items-center gap-2 cursor-pointer border px-3 py-1.5 rounded-lg hover:bg-slate-50"><input type="radio" name="toolStatus" value="endo" class="accent-emerald-500"><span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span> معالجة لبية</label>
+                    <label class="flex items-center gap-2 cursor-pointer border px-3 py-1.5 rounded-lg hover:bg-slate-50"><input type="radio" name="toolStatus" value="extracted" class="accent-slate-800"><span class="w-3 h-3 rounded-full bg-slate-800 inline-block"></span> مخلوع</label>
+                    <label class="flex items-center gap-2 cursor-pointer border px-3 py-1.5 rounded-lg hover:bg-slate-50"><input type="radio" name="toolStatus" value="clear" class="accent-slate-300"><span class="w-3 h-3 rounded-full bg-slate-200 border border-slate-400 inline-block"></span> مسح</label>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-8 overflow-x-auto">
+                <div>
+                    <h3 class="text-xs font-bold text-slate-400 mb-4 text-center">الفك العلوي (Upper Arch)</h3>
+                    <div class="flex justify-center gap-2 min-w-[700px]" id="upperArchContainer"></div>
+                </div>
+                <hr class="border-slate-200">
+                <div>
+                    <h3 class="text-xs font-bold text-slate-400 mb-4 text-center">الفك السفلي (Lower Arch)</h3>
+                    <div class="flex justify-center gap-2 min-w-[700px]" id="lowerArchContainer"></div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- EDIT PROFILE MODAL -->
+    <div id="onboardingModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+            <h3 id="onboardingTitle" class="text-lg font-bold text-slate-800">تعديل البيانات الشخصية</h3>
+            <form id="onboardingForm" onsubmit="saveProfileData(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">اسم الطالب الكامل *</label>
+                    <input type="text" id="onbName" required placeholder="د. أحمد علي" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">الجامعة *</label>
+                    <select id="onbUniversity" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                        <option value="جامعة دمشق">جامعة دمشق</option>
+                        <option value="جامعة اللاذقية">جامعة اللاذقية</option>
+                        <option value="جامعة حلب">جامعة حلب</option>
+                        <option value="جامعة حمص">جامعة حمص</option>
+                        <option value="جامعة طرطوس">جامعة طرطوس</option>
+                        <option value="جامعة حماة">جامعة حماة</option>
+                        <option value="جامعة خاصة">جامعة خاصة</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">السنة الدراسية *</label>
+                    <select id="onbYear" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                        <option value="أولى">السنة الأولى</option>
+                        <option value="ثانية">السنة الثانية</option>
+                        <option value="ثالثة">السنة الثالثة</option>
+                        <option value="رابعة">السنة الرابعة</option>
+                        <option value="خامسة">السنة الخامسة</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">رقم الهاتف *</label>
+                    <input type="tel" id="onbPhone" required placeholder="09xxxxxxxx" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                </div>
+                <p id="onboardingError" class="text-xs text-rose-600 min-h-[16px]"></p>
+                <div class="flex gap-2 pt-1">
+                    <button type="button" onclick="closeOnboardingModal()" class="flex-1 px-4 py-2 border rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-50">إلغاء</button>
+                    <button type="submit" class="flex-1 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-semibold shadow">حفظ التعديلات</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- CASE DETAILS MODAL -->
+    <div id="caseModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden items-center justify-center p-4 z-50 overflow-y-auto">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-3xl my-8 p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 id="caseModalTitle" class="text-lg font-bold text-slate-800">إضافة حالة سريرية جديدة</h3>
+                <button onclick="closeCaseModal()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <form id="caseForm" onsubmit="saveCase(event)" class="space-y-4">
+                <input type="hidden" id="cId">
+                <div class="grid md:grid-cols-2 gap-3">
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">عنوان الحالة *</label>
+                        <input type="text" id="cTitle" required placeholder="مثال: حشوة ضوئية صنف أول" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">المريض *</label>
+                        <select id="cPatientSelect" onchange="onCasePatientChange()" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">التخصص / المادة</label>
+                        <input type="text" id="cSubject" readonly class="w-full border rounded-lg px-3 py-2 text-sm bg-slate-100 text-slate-600">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">رقم السن / المنطقة *</label>
+                        <input type="text" id="cTooth" required placeholder="مثال: 16 أو الفك العلوي" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">حالة المعالجة</label>
+                        <select id="cStatus" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                            <option value="مخططة">مخططة</option>
+                            <option value="قيد المعالجة">قيد المعالجة</option>
+                            <option value="مكتملة">مكتملة</option>
+                            <option value="ملغاة">ملغاة</option>
+                        </select>
+                    </div>
+                </div>
+
+                <hr class="border-slate-200 my-2">
+
+                <div class="grid md:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">الشكوى الرئيسية (Chief Complaint)</label>
+                        <textarea id="cComplaint" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">التشخيص (Diagnosis)</label>
+                        <textarea id="cDiagnosis" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">خطة المعالجة (Treatment Plan)</label>
+                        <textarea id="cPlan" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">الإجراء المنجز (Procedure)</label>
+                        <textarea id="cProcedure" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">المواد المستخدمة (Materials)</label>
+                        <input type="text" id="cMaterials" placeholder="مثال: Composite A2, Etch, Bond" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">الاختلاطات إن وجدت (Complications)</label>
+                        <input type="text" id="cComplications" placeholder="مثال: انثقاب حجرة، انكماش..." class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">الصور الشعاعية (X-Rays)</label>
+                    <input type="file" id="cXrayInput" accept="image/*" multiple onchange="handleXRayUpload(event)" class="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100">
+                    <div id="xrayPreviewContainer" class="flex gap-2 mt-2 overflow-x-auto"></div>
+                </div>
+
+                <div class="grid md:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">تاريخ البدء</label>
+                        <input type="date" id="cStartDate" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">تاريخ الانتهاء</label>
+                        <input type="date" id="cEndDate" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">موعد المتابعة</label>
+                        <input type="date" id="cFollowUp" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">النتيجة والملاحظات العيادية</label>
+                    <textarea id="cNotes" rows="2" placeholder="تقييم المشرف، ملاحظات نجاح الحالة..." class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500"></textarea>
+                </div>
+
+                <div class="flex items-center gap-2 bg-teal-50 p-3 rounded-lg border border-teal-100">
+                    <input type="checkbox" id="cSyncAppointment" class="w-4 h-4 text-teal-600 accent-teal-600">
+                    <label for="cSyncAppointment" class="text-xs text-teal-800 font-semibold cursor-pointer">إضافة موعد المتابعة تلقائياً إلى جدول المواعيد</label>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-3 border-t">
+                    <button type="button" onclick="closeCaseModal()" class="px-4 py-2 border rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-50">إلغاء</button>
+                    <button type="submit" class="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-semibold shadow">حفظ الحالة</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- PATIENT MODAL -->
+    <div id="patientModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+            <h3 class="text-lg font-bold text-slate-800">إضافة مريض جديد</h3>
+            <form id="patientForm" onsubmit="savePatient(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">الاسم الكامل</label>
+                    <input type="text" id="pName" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">العمر</label>
+                        <input type="number" id="pAge" required min="0" max="120" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">الهاتف</label>
+                        <input type="tel" id="pPhone" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">المادة السريرية المطلوبة</label>
+                    <select id="pSubject" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                        <option value="مداواة ترميمية">مداواة ترميمية</option>
+                        <option value="مداواة لبية">مداواة لبية</option>
+                        <option value="تعويضات ثابتة">تعويضات ثابتة</option>
+                        <option value="تعويضات متحركة">تعويضات متحركة</option>
+                        <option value="تخدير وقلع">تخدير وقلع</option>
+                        <option value="أمراض اللثة">أمراض اللثة</option>
+                        <option value="أمراض الفم">أمراض الفم</option>
+                        <option value="أطفال">أطفال</option>
+                    </select>
+                </div>
+                <div class="flex justify-end gap-2 pt-3">
+                    <button type="button" onclick="closePatientModal()" class="px-4 py-2 border rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-50">إلغاء</button>
+                    <button type="submit" class="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-semibold">حفظ المريض</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- APPOINTMENT MODAL -->
+    <div id="appointmentModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+            <h3 class="text-lg font-bold text-slate-800">جدولة موعد جديد</h3>
+            <form id="appointmentForm" onsubmit="saveAppointment(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">اختر المريض</label>
+                    <select id="appPatientSelect" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500"></select>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">التاريخ</label>
+                        <input type="date" id="appDate" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">الوقت</label>
+                        <input type="time" id="appTime" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">ملاحظات الإجراء/العيادة</label>
+                    <input type="text" id="appNotes" placeholder="مثال: تحضير السن 16 للحشوة" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                </div>
+                <div class="flex justify-end gap-2 pt-3">
+                    <button type="button" onclick="closeAppointmentModal()" class="px-4 py-2 border rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-50">إلغاء</button>
+                    <button type="submit" class="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-semibold">تأكيد الموعد</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODERN CONFIRM DIALOG (replaces the browser's native confirm()) -->
+    <div id="confirmModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-[60]">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 space-y-4 text-center">
+            <div class="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+                <i data-lucide="trash-2" class="w-6 h-6"></i>
+            </div>
+            <p id="confirmModalMessage" class="text-sm text-slate-700 leading-6">هل أنت متأكد؟</p>
+            <div class="flex gap-2 pt-1">
+                <button type="button" onclick="closeConfirmModal()" class="flex-1 px-4 py-2 border rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-50">إلغاء</button>
+                <button type="button" onclick="confirmModalProceed()" class="flex-1 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm font-semibold shadow">تأكيد الحذف</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- X-RAY IMAGE LIGHTBOX (view / zoom) -->
+    <div id="xrayLightbox" class="fixed inset-0 bg-black/80 hidden items-center justify-center p-4 z-[70]" onclick="if(event.target===this) closeXrayLightbox()">
+        <button type="button" onclick="closeXrayLightbox()" class="absolute top-4 left-4 text-white bg-white/10 hover:bg-white/20 rounded-full w-9 h-9 flex items-center justify-center">
+            <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+        <img id="xrayLightboxImg" src="" class="max-w-full max-h-full rounded-lg shadow-2xl object-contain">
+    </div>
+
+    <!-- UPGRADE / LOCKED FEATURE MODAL -->
+    <div id="upgradeModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-[65]">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 space-y-4 text-center">
+            <div class="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+                <i data-lucide="lock" class="w-6 h-6"></i>
+            </div>
+            <h3 class="font-bold text-slate-800">ميزة مدفوعة 🔒</h3>
+            <p id="upgradeModalMessage" class="text-sm text-slate-600 leading-6">هذه الميزة متاحة فقط بعد تفعيل الحساب.</p>
+            <div class="flex flex-col gap-2 pt-1">
+                <button type="button" onclick="closeUpgradeModal(); openActivateCodeModal();" class="w-full px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-semibold">أدخل كود التفعيل</button>
+                <button type="button" onclick="closeUpgradeModal()" class="w-full px-4 py-2 border rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-50">لاحقاً</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ACTIVATE LICENSE CODE MODAL -->
+    <div id="activateCodeModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-[65]">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            <h3 class="font-bold text-slate-800 text-center">تفعيل الحساب</h3>
+            <p class="text-xs text-slate-500 text-center leading-5">أدخل كود التفعيل الذي حصلت عليه لفتح جميع الميزات وإزالة حدود النسخة المجانية.</p>
+            <form id="activateCodeForm" onsubmit="handleActivateCode(event)" class="space-y-3">
+                <input type="text" id="activateCodeInput" required placeholder="مثال: DENTRA-XXXX-XXXX" class="w-full border rounded-lg px-3 py-2.5 text-sm text-center tracking-widest focus:outline-none focus:ring-2 focus:ring-teal-500" style="text-transform: uppercase;">
+                <p id="activateCodeError" class="text-xs text-rose-600 min-h-[16px] text-center"></p>
+                <div class="flex gap-2">
+                    <button type="button" onclick="closeActivateCodeModal()" class="flex-1 px-4 py-2 border rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-50">إلغاء</button>
+                    <button type="submit" id="activateCodeSubmitBtn" class="flex-1 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-semibold shadow">تفعيل</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // FIREBASE INITIALIZATION (Auth + Firestore + Analytics)
+        // ============================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyDK-4u3wmL4Ipov9RlnfNupIxR6C6thhQY",
+            authDomain: "dentra-clinical.firebaseapp.com",
+            projectId: "dentra-clinical",
+            storageBucket: "dentra-clinical.firebasestorage.app",
+            messagingSenderId: "630998875236",
+            appId: "1:630998875236:web:2fa4917066615dfcfe7371",
+            measurementId: "G-8N1XJVEHRT"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        try { firebase.analytics(); } catch (e) { /* لا نعطّل التطبيق إن تعذّر تحميل Analytics */ }
+
+        // تفعيل التخزين المؤقت (Offline Persistence) ليعمل التطبيق دون إنترنت
+        // بعد أول تحميل ناجح للبيانات من الخادم
+        db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
+            console.warn('تعذر تفعيل التخزين المؤقت (Offline Persistence):', err.code);
+        });
+
+        let currentUser = null;      // مستخدم Firebase Auth الحالي
+        let studentProfile = null;   // نسخة محلية من وثيقة /students/{uid}
+
+        // DATA STRUCTURE & LOCALSTORAGE KEYS
+        // (لا تزال المرضى/الحالات/المتطلبات/المواعيد محلية مؤقتاً - سيتم ترحيلها إلى
+        //  Firestore في مرحلة قادمة من الخطة؛ الملف الشخصي والترخيص أصبحا في Firestore الآن)
+        // ملاحظات الشاشة الرئيسية السريعة أصبحت أيضاً في Firestore (حقل notes على وثيقة
+        // الطالب) بدل localStorage، لأن الأخير مشترك بين كل الحسابات على نفس الجهاز/المتصفح
+
+        // DEFAULT ACADEMIC REQUIREMENTS
+        const DEFAULT_REQUIREMENTS = [
+            { id: 'req_1', subject: 'مداواة ترميمية', goal: 10, completed: 0 },
+            { id: 'req_2', subject: 'مداواة لبية', goal: 6, completed: 0 },
+            { id: 'req_3', subject: 'تعويضات ثابتة', goal: 8, completed: 0 },
+            { id: 'req_4', subject: 'تعويضات متحركة', goal: 4, completed: 0 },
+            { id: 'req_5', subject: 'تخدير وقلع', goal: 12, completed: 0 },
+            { id: 'req_6', subject: 'أمراض اللثة', goal: 5, completed: 0 },
+            { id: 'req_7', subject: 'أمراض الفم', goal: 5, completed: 0 },
+            { id: 'req_8', subject: 'أطفال', goal: 6, completed: 0 }
+        ];
+
+        // ترتيب عرض المواد ثابت ومضمون (Firestore لا يضمن ترتيباً معيناً بدون orderBy،
+        // ولا نستخدم orderBy هنا لتفادي استبعاد أي مادة قديمة لا تملك الحقل المستخدم للترتيب)
+        const REQUIREMENT_SUBJECTS_ORDER = [
+            'مداواة ترميمية', 'مداواة لبية', 'تعويضات ثابتة', 'تعويضات متحركة',
+            'تخدير وقلع', 'أمراض اللثة', 'أمراض الفم', 'أطفال'
+        ];
+
+        // يحوّل أي رموز HTML خاصة إلى صيغتها النصية الآمنة، لمنع حقن HTML/JS (XSS) عند
+        // إدراج بيانات كتبها المستخدم (اسم مريض، ملاحظة، إلخ) داخل innerHTML - سواء كنص
+        // ظاهر أو داخل قيمة سمة (attribute) مثل data-name="..."
+        function escapeHtml(value) {
+            if (value === null || value === undefined) return '';
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        // ============================================================
+        // LICENSE / FREE-TIER LIMITS
+        // ============================================================
+        const FREE_PATIENT_LIMIT = 3;
+        const FREE_CASE_LIMIT = 3;
+
+        // يتحقق من صلاحية كائن ترخيص مُعطى (مُفعَّل ولم تنتهِ صلاحيته). دالة نقية تقبل
+        // بيانات الترخيص مباشرة، لتُستخدم مع النسخة المخزَّنة محلياً (studentProfile) أو
+        // مع بيانات مقروءة حديثاً من Firestore داخل transaction (للحصول على قيمة موثوقة)
+        function isLicenseActiveFromData(license) {
+            if (!license || license.status !== 'active') return false;
+            if (!license.expiresAt) return true; // نشط بلا تاريخ انتهاء محدَّد (حالة احتياطية)
+            const expiresMillis = license.expiresAt.toMillis
+                ? license.expiresAt.toMillis()
+                : new Date(license.expiresAt).getTime();
+            return Date.now() < expiresMillis;
+        }
+
+        function isLicenseActive() {
+            return isLicenseActiveFromData(studentProfile && studentProfile.license);
+        }
+
+        function showUpgradeModal(message) {
+            document.getElementById('upgradeModalMessage').textContent = message;
+            document.getElementById('upgradeModal').classList.remove('hidden');
+            document.getElementById('upgradeModal').classList.add('flex');
+            lucide.createIcons();
+        }
+
+        function closeUpgradeModal() {
+            document.getElementById('upgradeModal').classList.add('hidden');
+            document.getElementById('upgradeModal').classList.remove('flex');
+        }
+
+        // معرّف جهاز ثابت لكل متصفح/تطبيق مثبَّت، يُنشأ مرة واحدة ويُحفظ محلياً. هو
+        // الأساس الذي يرتبط به كود التفعيل (جهاز واحد لكل كود، بحسب خطة الترخيص)
+        function getDeviceId() {
+            let id = localStorage.getItem('dentra_device_id');
+            if (!id) {
+                id = (window.crypto && crypto.randomUUID)
+                    ? crypto.randomUUID()
+                    : ('dev_' + Date.now() + '_' + Math.random().toString(36).slice(2));
+                localStorage.setItem('dentra_device_id', id);
+            }
+            return id;
+        }
+
+        // يحوّل طابع وقت Firestore (أو أي قيمة تاريخ) إلى نص تاريخ محلي مقروء
+        function formatDateTimestamp(ts) {
+            if (!ts) return '';
+            const d = ts.toDate ? ts.toDate() : new Date(ts);
+            return getLocalDateStr(d);
+        }
+
+        // يعرض حالة الاشتراك الحالية في صفحة الملف الشخصي (مجاني / نشط حتى تاريخ / منتهي)
+        function renderLicenseStatus() {
+            const box = document.getElementById('licenseStatusBox');
+            if (!box) return;
+            const license = (studentProfile && studentProfile.license) || {};
+
+            if (isLicenseActive()) {
+                box.innerHTML = `
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-emerald-700 font-semibold flex items-center gap-1.5">
+                            <i data-lucide="check-circle" class="w-4 h-4"></i> حساب مفعَّل
+                        </span>
+                        <span class="text-xs text-slate-500">حتى ${escapeHtml(formatDateTimestamp(license.expiresAt))}</span>
+                    </div>
+                `;
+            } else {
+                const wasActive = license.status === 'active'; // كان مفعَّلاً سابقاً وانتهت صلاحيته الآن
+                box.innerHTML = `
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-slate-600 font-semibold flex items-center gap-1.5">
+                            <i data-lucide="${wasActive ? 'clock' : 'info'}" class="w-4 h-4"></i>
+                            ${wasActive ? 'انتهت صلاحية الاشتراك' : 'حساب مجاني'}
+                        </span>
+                        <button type="button" onclick="openActivateCodeModal()" class="text-xs bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded-lg font-semibold shrink-0">
+                            ${wasActive ? 'إعادة التفعيل' : 'تفعيل الحساب'}
+                        </button>
+                    </div>
+                `;
+            }
+            lucide.createIcons();
+        }
+
+        function openActivateCodeModal() {
+            document.getElementById('activateCodeForm').reset();
+            document.getElementById('activateCodeError').textContent = '';
+            document.getElementById('activateCodeModal').classList.remove('hidden');
+            document.getElementById('activateCodeModal').classList.add('flex');
+        }
+
+        function closeActivateCodeModal() {
+            document.getElementById('activateCodeModal').classList.add('hidden');
+            document.getElementById('activateCodeModal').classList.remove('flex');
+        }
+
+        async function handleActivateCode(e) {
+            e.preventDefault();
+            const input = document.getElementById('activateCodeInput');
+            const errEl = document.getElementById('activateCodeError');
+            const btn = document.getElementById('activateCodeSubmitBtn');
+            errEl.textContent = '';
+            btn.disabled = true;
+            btn.textContent = 'جارٍ التحقق...';
+
+            const result = await activateLicenseCode(input.value);
+
+            btn.disabled = false;
+            btn.textContent = 'تفعيل';
+            if (result.success) {
+                closeActivateCodeModal();
+                alert(result.message);
+            } else {
+                errEl.textContent = result.message;
+            }
+        }
+
+        // يتحقق من كود التفعيل ويُفعِّله فعلياً. يتطلب إنترنت دوماً (خطوة حساسة أمنياً
+        // ولا تُحفظ محلياً بشكل متفائل كبقية العمليات). القرار النهائي غير القابل
+        // للتلاعب دوماً في قاعدة أمان Firestore، لا في هذا الكود
+        async function activateLicenseCode(rawCode) {
+            const code = (rawCode || '').trim().toUpperCase();
+            if (!code) return { success: false, message: 'أدخل الكود أولاً.' };
+
+            const uid = currentUser.uid;
+            const deviceId = getDeviceId();
+            const codeRef = db.collection('licenseCodes').doc(code);
+
+            try {
+                const snap = await codeRef.get({ source: 'server' }); // قراءة حديثة دوماً لحالة حساسة كهذه
+                if (!snap.exists) return { success: false, message: 'كود غير صحيح.' };
+                const data = snap.data();
+
+                if (data.status === 'revoked') {
+                    return { success: false, message: 'تم إلغاء هذا الكود.' };
+                }
+
+                const now = Date.now();
+                const expiresMillis = data.expiresAt
+                    ? (data.expiresAt.toMillis ? data.expiresAt.toMillis() : new Date(data.expiresAt).getTime())
+                    : null;
+                if (expiresMillis !== null && now > expiresMillis) {
+                    return { success: false, message: 'انتهت صلاحية هذا الكود.' };
+                }
+
+                if (data.status === 'unused') {
+                    await codeRef.update({
+                        status: 'active',
+                        assignedToUid: uid,
+                        deviceId: deviceId,
+                        activatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                } else if (data.status === 'active') {
+                    if (data.assignedToUid !== uid) {
+                        return { success: false, message: 'هذا الكود مستخدَم بالفعل على حساب آخر.' };
+                    }
+                    if (data.deviceId && data.deviceId !== deviceId) {
+                        return { success: false, message: 'هذا الكود مفعَّل بالفعل على جهاز آخر. تواصل معنا لإعادة التفعيل على هذا الجهاز.' };
+                    }
+                    if (!data.deviceId) {
+                        // إعادة تفعيل على جهاز جديد بعد تصفير الإدارة لحقل الجهاز
+                        await codeRef.update({ deviceId: deviceId });
+                    }
+                    // وإن كان الجهاز مطابقاً بالفعل: هذا الكود نشط على هذا الجهاز أصلاً، لا حاجة لتحديثه
+                }
+
+                // مزامنة حالة الترخيص في وثيقة الطالب - قاعدة الأمان تتحقق من وجود هذا
+                // الكود مطابقاً بالفعل في licenseCodes قبل قبول هذه الكتابة
+                await db.collection('students').doc(uid).set({
+                    license: {
+                        status: 'active',
+                        code: code,
+                        deviceId: deviceId,
+                        activatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        expiresAt: data.expiresAt
+                    }
+                }, { merge: true });
+
+                return { success: true, message: 'تم تفعيل الحساب بنجاح! 🎉' };
+            } catch (err) {
+                console.error('تعذر تفعيل الكود:', err);
+                // نعرض كود ورسالة الخطأ الفعليين (لا رسالة عامة) للتشخيص الدقيق بدل التخمين
+                return { success: false, message: `تعذر التفعيل [${err.code || 'unknown'}]: ${err.message || err}` };
+            }
+        }
+
+        // يهيّئ عدّادات المرضى/الحالات وحقل license.expiresAt لحساب أُنشئ في مرحلة سابقة
+        // من التطوير قبل إضافة هذه الحقول. غياب هذه الحقول تماماً (لا مجرد null) يجعل
+        // قاعدة أمان Firestore ترفض عمليات هذا الحساب بالكامل (فحص isLicensed يحتاج
+        // قراءة license.expiresAt، وقراءة حقل غائب تماماً تُفشل تقييم القاعدة)
+        async function ensureCountersInitialized() {
+            const needsCounters = !(studentProfile && studentProfile.counters);
+            const needsExpiresAt = !(studentProfile && studentProfile.license &&
+                Object.prototype.hasOwnProperty.call(studentProfile.license, 'expiresAt'));
+            if (!needsCounters && !needsExpiresAt) return;
+
+            try {
+                const uid = currentUser.uid;
+                const studentRef = db.collection('students').doc(uid);
+                const patch = {};
+
+                if (needsCounters) {
+                    const [patientsCountSnap, casesCountSnap] = await Promise.all([
+                        studentRef.collection('patients').count().get(),
+                        studentRef.collection('cases').count().get()
+                    ]);
+                    patch.counters = {
+                        patients: patientsCountSnap.data().count,
+                        cases: casesCountSnap.data().count
+                    };
+                }
+
+                if (needsExpiresAt) {
+                    const currentLicense = (studentProfile && studentProfile.license) || { status: 'free', code: null, deviceId: null, activatedAt: null };
+                    patch.license = Object.assign({}, currentLicense, { expiresAt: currentLicense.expiresAt || null });
+                }
+
+                await studentRef.set(patch, { merge: true });
+                studentProfile = Object.assign({}, studentProfile, patch);
+            } catch (err) {
+                console.error('تعذر ترحيل بيانات الحساب القديمة:', err);
+            }
+        }
+
+        // ============================================================
+        // AUTHENTICATION (تسجيل الدخول / إنشاء حساب / تسجيل الخروج)
+        // ============================================================
+        window.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons(); // تفعيل الأيقونات فوراً (تلزم شاشة تسجيل الدخول أيضاً)
+        });
+
+        // مهلة احتياطية: إذا لم يستجب Firebase خلال 10 ثوانٍ (مشكلة اتصال، أو فتح
+        // الملف من مسار غير مدعوم مثل file:// أو content:// بدل http/https)، نعرض
+        // رسالة واضحة بدل بقاء المستخدم عالقاً على شاشة تحميل صامتة إلى الأبد.
+        let _authResolved = false;
+        setTimeout(() => {
+            if (_authResolved) return;
+            const textEl = document.getElementById('authLoadingText');
+            const retryBtn = document.getElementById('authLoadingRetryBtn');
+            if (textEl) textEl.textContent = 'تعذر التحقق من الحساب. تأكد من فتح التطبيق عبر رابط ويب (http/https) وليس بفتح الملف مباشرة، ومن اتصالك بالإنترنت، ثم أعد المحاولة.';
+            if (retryBtn) retryBtn.classList.remove('hidden');
+        }, 10000);
+
+        function showLoginForm() {
+            document.getElementById('signupForm').classList.add('hidden');
+            document.getElementById('loginForm').classList.remove('hidden');
+        }
+
+        function showSignupForm() {
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('signupForm').classList.remove('hidden');
+        }
+
+        function translateAuthError(err) {
+            const map = {
+                'auth/invalid-email': 'صيغة البريد الإلكتروني غير صحيحة',
+                'auth/user-not-found': 'لا يوجد حساب بهذا البريد الإلكتروني',
+                'auth/wrong-password': 'كلمة المرور غير صحيحة',
+                'auth/invalid-credential': 'البريد الإلكتروني أو كلمة المرور غير صحيحة',
+                'auth/email-already-in-use': 'هذا البريد مسجَّل مسبقاً، جرّب تسجيل الدخول بدلاً من ذلك',
+                'auth/weak-password': 'كلمة المرور ضعيفة جداً (6 أحرف على الأقل)',
+                'auth/network-request-failed': 'تعذر الاتصال بالخادم، تحقق من اتصالك بالإنترنت',
+                'auth/too-many-requests': 'محاولات كثيرة جداً، يرجى الانتظار قليلاً والمحاولة مجدداً'
+            };
+            return map[err.code] || ('حدث خطأ غير متوقع: ' + (err.message || ''));
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            const errEl = document.getElementById('loginError');
+            const btn = document.getElementById('loginSubmitBtn');
+            errEl.textContent = '';
+            btn.disabled = true; btn.textContent = 'جارٍ التحقق...';
+            try {
+                await auth.signInWithEmailAndPassword(email, password);
+                // دالة onAuthStateChanged أدناه ستتولى عرض التطبيق تلقائياً
+            } catch (err) {
+                errEl.textContent = translateAuthError(err);
+            }
+            btn.disabled = false; btn.textContent = 'تسجيل الدخول';
+        }
+
+        async function handleSignup(e) {
+            e.preventDefault();
+            const email = document.getElementById('suEmail').value.trim();
+            const password = document.getElementById('suPassword').value;
+            const errEl = document.getElementById('signupError');
+            const btn = document.getElementById('signupSubmitBtn');
+            errEl.textContent = '';
+            btn.disabled = true; btn.textContent = 'جارٍ إنشاء الحساب...';
+            try {
+                const cred = await auth.createUserWithEmailAndPassword(email, password);
+                const profile = {
+                    email: email,
+                    name: document.getElementById('suName').value.trim(),
+                    university: document.getElementById('suUniversity').value,
+                    year: document.getElementById('suYear').value,
+                    phone: document.getElementById('suPhone').value.trim(),
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    license: { status: 'free', code: null, deviceId: null, activatedAt: null, expiresAt: null },
+                    counters: { patients: 0, cases: 0 },
+                    notes: ''
+                };
+                await db.collection('students').doc(cred.user.uid).set(profile);
+                // دالة onAuthStateChanged أدناه ستتولى عرض التطبيق تلقائياً
+            } catch (err) {
+                errEl.textContent = translateAuthError(err);
+            }
+            btn.disabled = false; btn.textContent = 'إنشاء الحساب والبدء';
+        }
+
+        function handleLogout() {
+            showConfirmDialog('هل تريد تسجيل الخروج؟', () => {
+                auth.signOut();
+            });
+        }
+
+        function showAuthScreen() {
+            _authResolved = true;
+            document.getElementById('authLoading').classList.add('hidden');
+            document.getElementById('authScreen').classList.remove('hidden');
+            document.querySelector('header').classList.add('hidden');
+            document.querySelector('main').classList.add('hidden');
+            document.getElementById('loginForm').reset();
+            document.getElementById('signupForm').reset();
+            document.getElementById('loginError').textContent = '';
+            document.getElementById('signupError').textContent = '';
+            showLoginForm();
+        }
+
+        function showAppShell() {
+            _authResolved = true;
+            document.getElementById('authLoading').classList.add('hidden');
+            document.getElementById('authScreen').classList.add('hidden');
+            document.querySelector('header').classList.remove('hidden');
+            document.querySelector('main').classList.remove('hidden');
+        }
+
+        auth.onAuthStateChanged(async (user) => {
+            if (!user) {
+                currentUser = null;
+                studentProfile = null;
+                // إلغاء كل مستمعي Firestore الحيّين فوراً؛ وإلا يبقون يعملون في الخلفية
+                // بلا فائدة (ويفشلون بخطأ صلاحيات غير ضروري بعد زوال جلسة المصادقة)
+                _firestoreUnsubscribers.forEach(unsub => unsub());
+                _firestoreUnsubscribers = [];
+                showAuthScreen();
+                return;
+            }
+            currentUser = user;
+            try {
+                const doc = await db.collection('students').doc(user.uid).get();
+                studentProfile = doc.exists ? doc.data() : {};
+            } catch (err) {
+                console.error('تعذر تحميل بيانات الطالب:', err);
+                studentProfile = {};
+            }
+            showAppShell();
+            initApp();
+        });
+
+        // ============================================================
+        // APP INITIALIZATION (يعمل فقط بعد تسجيل الدخول بنجاح)
+        // ============================================================
+        // أرصدة محلية (Cache) تُحدَّث تلقائياً عبر مستمعي Firestore الحيّين أدناه
+        let patientsCache = [];
+        let casesCache = [];
+        let requirementsCache = [];
+        let appointmentsCache = [];
+        let _firestoreUnsubscribers = [];
+        let _reqsSeeded = false;
+        let _restoreInProgress = false; // true أثناء تنفيذ استرجاع نسخة احتياطية فقط
+
+        function initApp() {
+            lucide.createIcons();
+            updateProfileUI(studentProfile || {});
+            ensureCountersInitialized();
+            setupFirestoreListeners();
+            renderUpperArch();
+            renderLowerArch();
+        }
+
+        // يُنشئ مستمعين حيّين (onSnapshot) على مجموعات الطالب في Firestore، بحيث تُحدَّث
+        // الأرصدة المحلية (Cache) وتُعاد كل واجهة ذات صلة تلقائياً عند أي تغيير - سواء
+        // كان التغيير محلياً (حتى بدون إنترنت، عبر النسخة المخزَّنة مؤقتاً) أو من الخادم
+        function setupFirestoreListeners() {
+            // إلغاء أي مستمعين سابقين أولاً (تحسباً لتسجيل دخول متكرر دون إعادة تحميل الصفحة)
+            _firestoreUnsubscribers.forEach(unsub => unsub());
+            _firestoreUnsubscribers = [];
+
+            const uid = currentUser.uid;
+            const studentRef = db.collection('students').doc(uid);
+
+            // مستمع حيّ على وثيقة الطالب نفسها: يبقي studentProfile (البروفايل، حالة
+            // الترخيص، عدّادات المرضى/الحالات) محدَّثاً تلقائياً دون الحاجة لإعادة تحميل
+            // الصفحة - وهذا ما يجعل فحص الحد المجاني عند كل إضافة يعتمد على آخر عدّاد
+            // معروف محلياً، ويعمل بذلك حتى دون إنترنت (Firestore يطبّق الكتابات المعلّقة
+            // على النسخة المحلية فوراً حتى قبل مزامنتها مع الخادم)
+            _firestoreUnsubscribers.push(
+                studentRef.onSnapshot(snap => {
+                    if (snap.exists) {
+                        studentProfile = snap.data();
+                        updateProfileUI(studentProfile);
+                        renderDashboard();
+                    }
+                }, err => console.error('تعذر تحميل بيانات الطالب:', err))
+            );
+
+            _firestoreUnsubscribers.push(
+                studentRef.collection('patients').orderBy('createdAt', 'desc').onSnapshot(snap => {
+                    patientsCache = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+                    renderPatients();
+                    setupCaseModalLogic();
+                }, err => console.error('تعذر تحميل المرضى:', err))
+            );
+
+            _firestoreUnsubscribers.push(
+                studentRef.collection('cases').orderBy('createdAt', 'desc').onSnapshot(snap => {
+                    casesCache = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+                    renderCases();
+                }, err => console.error('تعذر تحميل الحالات:', err))
+            );
+
+            _firestoreUnsubscribers.push(
+                studentRef.collection('requirements').onSnapshot(snap => {
+                    // أثناء تنفيذ استرجاع نسخة احتياطية، لا نتدخل بأي زرع/ترحيل تلقائي: اللقطة
+                    // الفارغة اللحظية هنا متوقعة (لأن الاسترجاع يحذف كل شيء قبل إعادة الإضافة)
+                    // وليست دليلاً على أن هذا حساب جديد يحتاج متطلبات افتراضية
+                    if (_restoreInProgress) return;
+
+                    if (snap.empty) {
+                        seedDefaultRequirements();
+                        return; // سيصل مستمع جديد بالبيانات فور اكتمال الزرع أدناه
+                    }
+                    requirementsCache = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+                    requirementsCache.sort((a, b) => {
+                        const ia = REQUIREMENT_SUBJECTS_ORDER.indexOf(a.subject);
+                        const ib = REQUIREMENT_SUBJECTS_ORDER.indexOf(b.subject);
+                        return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+                    });
+
+                    // ترحيل: إضافة مادة "أمراض الفم" تلقائياً لحساب لديه متطلبات محفوظة مسبقاً بدونها
+                    if (!requirementsCache.some(r => r.subject === 'أمراض الفم')) {
+                        studentRef.collection('requirements').add({ subject: 'أمراض الفم', goal: 5, completed: 0 })
+                            .catch(err => console.error('تعذر إضافة مادة أمراض الفم:', err));
+                    }
+
+                    renderRequirements();
+                    renderDashboard();
+                }, err => console.error('تعذر تحميل المتطلبات:', err))
+            );
+
+            _firestoreUnsubscribers.push(
+                studentRef.collection('appointments').onSnapshot(snap => {
+                    appointmentsCache = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+                    renderSchedule();
+                    renderHomeTodayAppointments();
+                }, err => console.error('تعذر تحميل المواعيد:', err))
+            );
+        }
+
+        // يزرع قائمة المتطلبات الافتراضية لحساب الطالب عند أول استخدام فقط (حين تكون
+        // المجموعة فارغة تماماً على Firestore)
+        async function seedDefaultRequirements() {
+            if (_reqsSeeded) return;
+            _reqsSeeded = true;
+            try {
+                const batch = db.batch();
+                const reqsRef = db.collection('students').doc(currentUser.uid).collection('requirements');
+                DEFAULT_REQUIREMENTS.forEach(r => {
+                    batch.set(reqsRef.doc(), { subject: r.subject, goal: r.goal, completed: 0 });
+                });
+                await batch.commit();
+            } catch (err) {
+                console.error('تعذر تهيئة قائمة المتطلبات الافتراضية:', err);
+                _reqsSeeded = false; // السماح بإعادة المحاولة عند وصول لقطة فارغة أخرى
+            }
+        }
+
+        // MODERN CONFIRM DIALOG (replaces the browser's native confirm())
+        // Usage: showConfirmDialog('رسالة التأكيد', () => { /* ما سيُنفَّذ عند الموافقة */ });
+        let _confirmCallback = null;
+
+        function showConfirmDialog(message, onConfirm) {
+            document.getElementById('confirmModalMessage').textContent = message;
+            _confirmCallback = onConfirm;
+            document.getElementById('confirmModal').classList.remove('hidden');
+            document.getElementById('confirmModal').classList.add('flex');
+            lucide.createIcons();
+        }
+
+        function closeConfirmModal() {
+            document.getElementById('confirmModal').classList.add('hidden');
+            document.getElementById('confirmModal').classList.remove('flex');
+            _confirmCallback = null;
+        }
+
+        function confirmModalProceed() {
+            const cb = _confirmCallback;
+            closeConfirmModal();
+            if (typeof cb === 'function') cb();
+        }
+
+        // ============================================================
+        // PROFILE MANAGEMENT (يُقرأ/يُكتب في Firestore بدل localStorage)
+        // ============================================================
+        async function saveProfileData(e) {
+            e.preventDefault();
+            if (!currentUser) return;
+            const errEl = document.getElementById('onboardingError');
+            errEl.textContent = '';
+            const profile = {
+                name: document.getElementById('onbName').value.trim(),
+                university: document.getElementById('onbUniversity').value,
+                year: document.getElementById('onbYear').value,
+                phone: document.getElementById('onbPhone').value.trim()
+            };
+            try {
+                await db.collection('students').doc(currentUser.uid).set(profile, { merge: true });
+                studentProfile = Object.assign({}, studentProfile || {}, profile);
+                updateProfileUI(studentProfile);
+                renderDashboard();
+                closeOnboardingModal();
+            } catch (err) {
+                errEl.textContent = 'تعذر حفظ البيانات، تحقق من اتصالك بالإنترنت وحاول مرة أخرى.';
+            }
+        }
+
+        function updateProfileUI(profile) {
+            document.getElementById('profEmail').textContent = (currentUser && currentUser.email) || profile.email || '-';
+            document.getElementById('profName').textContent = profile.name || '-';
+            document.getElementById('profUniversity').textContent = profile.university || '-';
+            document.getElementById('profYear').textContent = profile.year || '-';
+            document.getElementById('profPhone').textContent = profile.phone || '-';
+            renderLicenseStatus();
+        }
+
+        function openProfileEditModal() {
+            const profile = studentProfile || {};
+            document.getElementById('onbName').value = profile.name || '';
+            document.getElementById('onbUniversity').value = profile.university || 'جامعة دمشق';
+            document.getElementById('onbYear').value = profile.year || 'أولى';
+            document.getElementById('onbPhone').value = profile.phone || '';
+            document.getElementById('onboardingError').textContent = '';
+
+            document.getElementById('onboardingModal').classList.remove('hidden');
+            document.getElementById('onboardingModal').classList.add('flex');
+        }
+
+        function closeOnboardingModal() {
+            document.getElementById('onboardingModal').classList.add('hidden');
+            document.getElementById('onboardingModal').classList.remove('flex');
+        }
+
+        // BACKUP & RESTORE DATA
+        async function exportDataBackup() {
+            try {
+                const uid = currentUser.uid;
+                // جلب صور كل حالة (أصبحت مخزَّنة في مجموعة فرعية منفصلة xrays) لتضمينها في النسخة الاحتياطية
+                const casesWithXrays = await Promise.all(casesCache.map(async (c) => {
+                    try {
+                        const xraysSnap = await db.collection('students').doc(uid).collection('cases').doc(c.id).collection('xrays').get();
+                        return Object.assign({}, c, { xrays: xraysSnap.docs.map(d => d.data().data) });
+                    } catch (err) {
+                        return Object.assign({}, c, { xrays: [] });
+                    }
+                }));
+
+                const backupData = {
+                    profile: studentProfile || null,
+                    patients: patientsCache,
+                    cases: casesWithXrays,
+                    requirements: requirementsCache,
+                    appointments: appointmentsCache,
+                    exportDate: new Date().toISOString()
+                };
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
+                const downloadAnchor = document.createElement('a');
+                downloadAnchor.setAttribute("href", dataStr);
+                downloadAnchor.setAttribute("download", `dentra_backup_${new Date().toISOString().slice(0,10)}.json`);
+                document.body.appendChild(downloadAnchor);
+                downloadAnchor.click();
+                downloadAnchor.remove();
+            } catch (err) {
+                alert('تعذر إنشاء النسخة الاحتياطية، تحقق من اتصالك بالإنترنت: ' + err.message);
+            }
+        }
+
+        function importDataBackup(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                let data;
+                try {
+                    data = JSON.parse(e.target.result);
+                } catch (err) {
+                    alert('خطأ في قراءة ملف JSON');
+                    return;
+                }
+                if (!data.patients || !data.cases) {
+                    alert('ملف النسخة الاحتياطية غير صالحة!');
+                    return;
+                }
+                showConfirmDialog('سيستبدل هذا كل بياناتك الحالية (المرضى، الحالات، المتطلبات، المواعيد) بمحتوى النسخة الاحتياطية المختارة. هل تريد المتابعة؟', () => {
+                    restoreBackupData(data);
+                });
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        // يحذف كل الوثائق ضمن مجموعة معينة (يُستخدم قبل الاسترجاع لضمان استبدال كامل
+        // للبيانات القديمة بدل دمجها مع الجديدة). يقرأ من الخادم مباشرة (source: 'server')
+        // بدل الاعتماد على أي نسخة محلية مؤقتة، ويكرر التحقق عدة مرات احتياطاً لضمان عدم
+        // بقاء أي وثيقة قديمة قد تتزامن مع بيانات الاسترجاع الجديدة وتظهر كتكرار
+        async function deleteAllInCollection(collectionRef) {
+            for (let attempt = 0; attempt < 4; attempt++) {
+                const snap = await collectionRef.get({ source: 'server' });
+                if (snap.empty) return;
+                const batch = db.batch();
+                snap.forEach(doc => batch.delete(doc.ref));
+                await batch.commit();
+            }
+        }
+
+        // يحذف كل الحالات مع صورها الشعاعية (المجموعات الفرعية) قبل الاسترجاع
+        async function deleteAllCasesWithXrays(uid) {
+            const casesCollectionRef = db.collection('students').doc(uid).collection('cases');
+            for (let attempt = 0; attempt < 4; attempt++) {
+                const casesSnap = await casesCollectionRef.get({ source: 'server' });
+                if (casesSnap.empty) return;
+                const batch = db.batch();
+                for (const caseDoc of casesSnap.docs) {
+                    const xraysSnap = await caseDoc.ref.collection('xrays').get({ source: 'server' });
+                    xraysSnap.forEach(x => batch.delete(x.ref));
+                    batch.delete(caseDoc.ref);
+                }
+                await batch.commit();
+            }
+        }
+
+        // يستعيد نسخة احتياطية كاملة إلى Firestore، مع الحفاظ على المعرّفات الأصلية
+        // للمرضى/الحالات كي تبقى الروابط بينها (patientId داخل كل حالة) سليمة بعد الاسترجاع
+        async function restoreBackupData(data) {
+            const uid = currentUser.uid;
+            _restoreInProgress = true;
+            try {
+                if (data.profile) {
+                    await db.collection('students').doc(uid).set({
+                        name: data.profile.name || '',
+                        university: data.profile.university || '',
+                        year: data.profile.year || '',
+                        phone: data.profile.phone || ''
+                    }, { merge: true });
+                }
+
+                // استبدال كامل: حذف كل شيء أولاً لتفادي تعارض أو تكرار السجلات القديمة
+                await deleteAllInCollection(db.collection('students').doc(uid).collection('patients'));
+                await deleteAllCasesWithXrays(uid);
+                await deleteAllInCollection(db.collection('students').doc(uid).collection('requirements'));
+                await deleteAllInCollection(db.collection('students').doc(uid).collection('appointments'));
+
+                const patientsRef = db.collection('students').doc(uid).collection('patients');
+                const casesRef = db.collection('students').doc(uid).collection('cases');
+                const reqsRef = db.collection('students').doc(uid).collection('requirements');
+                const appsRef = db.collection('students').doc(uid).collection('appointments');
+
+                let batch = db.batch();
+                let opCount = 0;
+                const commitIfNeeded = async () => {
+                    if (opCount >= 400) { // هامش أمان تحت حد 500 عملية لكل batch في Firestore
+                        await batch.commit();
+                        batch = db.batch();
+                        opCount = 0;
+                    }
+                };
+
+                for (const p of (data.patients || [])) {
+                    const { id, ...rest } = p;
+                    // نعيد تعيين createdAt بطابع وقت صالح جديد: الطابع الأصلي يفقد نوعه الخاص
+                    // (Timestamp) بعد المرور بـ JSON.stringify/JSON.parse، وaordBy('createdAt')
+                    // في مستمع المرضى يستبعد أي وثيقة بلا طابع وقت صالح - فتختفي من العرض تماماً
+                    rest.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                    batch.set(patientsRef.doc(id || patientsRef.doc().id), rest);
+                    opCount++; await commitIfNeeded();
+                }
+
+                for (const c of (data.cases || [])) {
+                    const { id, xrays, ...rest } = c;
+                    rest.createdAt = firebase.firestore.FieldValue.serverTimestamp(); // نفس سبب إصلاح المرضى أعلاه
+                    const caseRef = casesRef.doc(id || casesRef.doc().id);
+                    batch.set(caseRef, rest);
+                    opCount++; await commitIfNeeded();
+                    if (Array.isArray(xrays)) {
+                        for (const xrayData of xrays) {
+                            batch.set(caseRef.collection('xrays').doc(), {
+                                data: xrayData,
+                                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                            opCount++; await commitIfNeeded();
+                        }
+                    }
+                }
+
+                for (const r of (data.requirements || [])) {
+                    const { id, ...rest } = r;
+                    batch.set(reqsRef.doc(id || reqsRef.doc().id), rest);
+                    opCount++; await commitIfNeeded();
+                }
+
+                for (const a of (data.appointments || [])) {
+                    const { id, ...rest } = a;
+                    batch.set(appsRef.doc(id || appsRef.doc().id), rest);
+                    opCount++; await commitIfNeeded();
+                }
+
+                await batch.commit();
+                alert('تم استرجاع البيانات بنجاح!');
+                // لا حاجة لإعادة تحميل الصفحة - المستمعون الحيّون (onSnapshot) سيحدّثون الواجهة تلقائياً
+            } catch (err) {
+                alert('تعذر استرجاع البيانات: ' + err.message);
+            } finally {
+                _restoreInProgress = false;
+                // المستمع الحي تجاهل كل تحديثات المتطلبات أثناء الاسترجاع (لمنع تكرارها)،
+                // لذا نُعيد تحميلها يدوياً الآن من الخادم لتعكس الواجهة النتيجة الصحيحة فوراً
+                try {
+                    const freshSnap = await db.collection('students').doc(uid).collection('requirements').get({ source: 'server' });
+                    requirementsCache = freshSnap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+                    requirementsCache.sort((a, b) => {
+                        const ia = REQUIREMENT_SUBJECTS_ORDER.indexOf(a.subject);
+                        const ib = REQUIREMENT_SUBJECTS_ORDER.indexOf(b.subject);
+                        return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+                    });
+                    renderRequirements();
+                    renderDashboard();
+                } catch (err) {
+                    console.error('تعذر إعادة تحميل المتطلبات بعد الاسترجاع:', err);
+                }
+            }
+        }
+
+        // NAVIGATION TABS
+        function switchTab(tabId) {
+            const tabs = ['home', 'patients', 'cases', 'requirements', 'schedule', 'profile', 'odontogram'];
+            const inactiveBtnClass = 'px-3 py-2 rounded-lg text-sm font-semibold transition hover:bg-teal-600 text-teal-100 flex items-center gap-1.5 whitespace-nowrap';
+            const activeBtnClass = 'px-3 py-2 rounded-lg text-sm font-semibold transition bg-teal-800 text-white flex items-center gap-1.5 whitespace-nowrap';
+            tabs.forEach(id => {
+                const el = document.getElementById(`view-${id}`);
+                const btn = document.getElementById(`tab-${id}`);
+                if (el) el.classList.add('hidden');
+                if (btn) btn.className = inactiveBtnClass;
+            });
+
+            const activeEl = document.getElementById(`view-${tabId}`);
+            const activeBtn = document.getElementById(`tab-${tabId}`);
+            if (activeEl) activeEl.classList.remove('hidden');
+            if (activeBtn) activeBtn.className = activeBtnClass;
+
+            if (tabId === 'home') renderDashboard();
+            if (tabId === 'patients') renderPatients();
+            if (tabId === 'cases') renderCases();
+            if (tabId === 'requirements') renderRequirements();
+            if (tabId === 'schedule') renderSchedule();
+            
+            lucide.createIcons();
+        }
+
+        // DASHBOARD (HOME) RENDER
+        function renderDashboard() {
+            const profile = studentProfile;
+            const reqs = requirementsCache;
+
+            const welcomeNameEl = document.getElementById('welcomeStudentName');
+            const welcomeUnivEl = document.getElementById('welcomeUniversity');
+            if (welcomeNameEl) welcomeNameEl.textContent = (profile && profile.name) ? `أهلاً بك، ${profile.name}` : 'أهلاً بك، دكتور';
+            if (welcomeUnivEl) welcomeUnivEl.textContent = (profile && profile.university) ? profile.university : '';
+
+            let totalCompleted = 0, totalGoal = 0;
+            reqs.forEach(r => { totalCompleted += (r.completed || 0); totalGoal += (r.goal || 0); });
+            const progressPercent = totalGoal > 0 ? Math.round((totalCompleted / totalGoal) * 100) : 0;
+
+            const progressText = document.getElementById('progressPercentText');
+            const progressBar = document.getElementById('progressBarFill');
+            if (progressText) progressText.textContent = `${progressPercent}%`;
+            if (progressBar) progressBar.style.width = `${progressPercent}%`;
+
+            renderHomeTodayAppointments();
+
+            // Quick notes - تُقرأ من وثيقة الطالب في Firestore (لا localStorage المشترك بين الحسابات)
+            const notesEl = document.getElementById('homeQuickNotes');
+            if (notesEl) notesEl.value = (studentProfile && studentProfile.notes) || '';
+        }
+
+        // يعرض/يحدّث قائمة "مواعيد اليوم" في الشاشة الرئيسية. دالة مستقلة (لا تعتمد على
+        // renderDashboard كاملة) بحيث يمكن استدعاؤها فوراً من saveAppointment/deleteAppointment/
+        // saveCase عند إضافة أو حذف موعد، ليبقى حقل "مواعيد اليوم" متزامناً دون الحاجة للتنقل
+        // بين التبويبات.
+        // يبني نص تاريخ محلي بصيغة YYYY-MM-DD اعتماداً على توقيت الجهاز (لا UTC)، لضمان
+        // مطابقة صحيحة مع القيمة النصية التي يخزّنها حقل <input type="date"> دائماً بالتوقيت المحلي
+        function getLocalDateStr(d) {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function renderHomeTodayAppointments() {
+            const appointments = appointmentsCache;
+            const now = new Date();
+            const todayStr = getLocalDateStr(now);
+            const nowTimeStr = now.toTimeString().slice(0, 5); // "HH:MM" بالتوقيت المحلي
+
+            // نعرض فقط مواعيد اليوم التي لم يحن وقتها بعد أو لا تزال جارية الآن؛ المواعيد
+            // التي تجاوزها الوقت تختفي تلقائياً من هذه القائمة (تبقى مسجَّلة بالطبع في
+            // "جدول المواعيد" الكامل، هذا فقط تذكير سريع بما تبقى من اليوم)
+            const todayApps = appointments.filter(a => a.date === todayStr && (!a.time || a.time >= nowTimeStr));
+            const homeToday = document.getElementById('homeTodayAppointments');
+            if (!homeToday) return;
+
+            if (todayApps.length === 0) {
+                homeToday.innerHTML = '<p class="text-xs text-slate-400">لا توجد مواعيد متبقية لهذا اليوم.</p>';
+            } else {
+                homeToday.innerHTML = todayApps
+                    .sort((a, b) => (a.time || '').localeCompare(b.time || ''))
+                    .map(a => `
+                        <div class="bg-slate-50 p-3 rounded-lg border border-slate-100 text-xs flex justify-between items-center">
+                            <div>
+                                <p class="font-bold text-slate-800">${escapeHtml(a.patientName)}</p>
+                                <p class="text-slate-500">${escapeHtml(a.notes || '')}</p>
+                            </div>
+                            <span class="font-semibold text-teal-700">${escapeHtml(a.time)}</span>
+                        </div>
+                    `).join('');
+            }
+        }
+
+        // تحديث دوري كل دقيقة، حتى بدون أي تغيير في البيانات نفسها، لإزالة المواعيد التي
+        // يتجاوزها الوقت من قائمة "مواعيد اليوم" تلقائياً دون الحاجة لتحديث الصفحة يدوياً
+        setInterval(() => {
+            if (currentUser) renderHomeTodayAppointments();
+        }, 60000);
+
+        async function saveQuickNotes() {
+            const notesEl = document.getElementById('homeQuickNotes');
+            if (!notesEl || !currentUser) return;
+            try {
+                await db.collection('students').doc(currentUser.uid).set({ notes: notesEl.value }, { merge: true });
+            } catch (err) {
+                alert('تعذر حفظ الملاحظات، تحقق من اتصالك بالإنترنت وحاول مرة أخرى.');
+            }
+        }
+
+        // PATIENTS MANAGEMENT
+        function renderPatients() {
+            const patients = patientsCache;
+            const search = (document.getElementById('searchInput')?.value || '').toLowerCase();
+            const filterSubject = document.getElementById('filterSubject')?.value || 'ALL';
+
+            const list = document.getElementById('patientList');
+            list.innerHTML = '';
+
+            const filtered = patients.filter(p => {
+                const matchSearch = p.name.toLowerCase().includes(search) || p.phone.includes(search);
+                const matchSubject = filterSubject === 'ALL' || p.subject === filterSubject;
+                return matchSearch && matchSubject;
+            });
+
+            if (filtered.length === 0) {
+                list.innerHTML = '<p class="col-span-full text-center text-slate-400 py-8 text-sm">لا يوجد مرضى مطابقين للبحث.</p>';
+                return;
+            }
+
+            filtered.forEach(p => {
+                const card = document.createElement('div');
+                card.className = 'bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between gap-3';
+                card.innerHTML = `
+                    <div>
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="font-bold text-slate-800 text-base">${escapeHtml(p.name)}</h3>
+                            <span class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">${escapeHtml(p.age)} سنة</span>
+                        </div>
+                        <p class="text-xs text-slate-500 flex items-center gap-1 mb-1"><i data-lucide="phone" class="w-3.5 h-3.5"></i> ${escapeHtml(p.phone)}</p>
+                        <p class="text-xs text-teal-700 font-semibold bg-teal-50 px-2 py-1 rounded w-fit">${escapeHtml(p.subject)}</p>
+                    </div>
+                    <div class="flex gap-2 pt-2 border-t border-slate-100">
+                        <button onclick="openOdontogram('${p.id}')" class="flex-1 bg-teal-50 hover:bg-teal-100 text-teal-700 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 border border-teal-200">
+                            <i data-lucide="file-text" class="w-3.5 h-3.5"></i> مخطط الأسنان
+                        </button>
+                        <button onclick="deletePatient('${p.id}')" class="text-rose-500 hover:text-rose-700 p-1.5 border border-rose-100 rounded-lg">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                `;
+                list.appendChild(card);
+            });
+            lucide.createIcons();
+        }
+
+        function openPatientModal() {
+            document.getElementById('patientForm').reset();
+            document.getElementById('patientModal').classList.remove('hidden');
+            document.getElementById('patientModal').classList.add('flex');
+        }
+
+        function closePatientModal() {
+            document.getElementById('patientModal').classList.add('hidden');
+            document.getElementById('patientModal').classList.remove('flex');
+        }
+
+        async function savePatient(e) {
+            e.preventDefault();
+            const btn = document.getElementById('patientForm').querySelector('button[type="submit"]');
+            const newPatient = {
+                name: document.getElementById('pName').value.trim(),
+                age: document.getElementById('pAge').value,
+                phone: document.getElementById('pPhone').value.trim(),
+                subject: document.getElementById('pSubject').value,
+                odontogram: {},
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+
+            // فحص الحد المجاني من آخر عدّاد معروف محلياً (يعمل دون إنترنت). هذا الفحص
+            // للتجربة السريعة والواجهة فقط؛ الفحص الحاسم غير القابل للتجاوز سيكون في
+            // قاعدة أمان Firestore (المرحلة القادمة)، والتي قد ترفض هذه الإضافة لاحقاً
+            // عند المزامنة إن تبيّن تجاوز الحد فعلياً (حالة نادرة، راجع الشرح المرفق)
+            const counters = (studentProfile && studentProfile.counters) || { patients: 0, cases: 0 };
+            if (!isLicenseActive() && (counters.patients || 0) >= FREE_PATIENT_LIMIT) {
+                closePatientModal();
+                showUpgradeModal(`لقد وصلت إلى الحد الأقصى (${FREE_PATIENT_LIMIT} مرضى) في النسخة المجانية. أدخل كود تفعيل لإضافة عدد غير محدود من المرضى.`);
+                return;
+            }
+
+            if (btn) { btn.disabled = true; }
+            try {
+                const uid = currentUser.uid;
+                const studentRef = db.collection('students').doc(uid);
+                const batch = db.batch();
+                const newPatientRef = studentRef.collection('patients').doc();
+                batch.set(newPatientRef, newPatient);
+                batch.set(studentRef, {
+                    counters: { patients: firebase.firestore.FieldValue.increment(1) }
+                }, { merge: true });
+                await batch.commit();
+                closePatientModal();
+                // renderPatients() سيُستدعى تلقائياً عبر المستمع (onSnapshot) فور نجاح الحفظ
+            } catch (err) {
+                alert('تعذر حفظ المريض، تحقق من اتصالك بالإنترنت وحاول مرة أخرى.');
+            }
+            if (btn) { btn.disabled = false; }
+        }
+
+        function deletePatient(pId) {
+            showConfirmDialog('هل أنت متأكد من حذف هذا المريض وكل الحالات المربوطة به؟', async () => {
+                try {
+                    const uid = currentUser.uid;
+                    const studentRef = db.collection('students').doc(uid);
+                    const batch = db.batch();
+                    batch.delete(studentRef.collection('patients').doc(pId));
+
+                    const casesSnap = await studentRef.collection('cases')
+                        .where('patientId', '==', pId).get();
+                    for (const caseDoc of casesSnap.docs) {
+                        await addCaseDeletionsToBatch(batch, uid, caseDoc.id);
+                    }
+
+                    batch.set(studentRef, {
+                        counters: {
+                            patients: firebase.firestore.FieldValue.increment(-1),
+                            cases: firebase.firestore.FieldValue.increment(-casesSnap.size)
+                        }
+                    }, { merge: true });
+
+                    await batch.commit();
+                } catch (err) {
+                    alert(`تعذر حذف المريض [${err.code || 'unknown'}]: ${err.message}`);
+                }
+            });
+        }
+
+        // CLINICAL CASES MANAGEMENT
+        // إدارة الصور الشعاعية لحالة قيد التحرير في النافذة المنبثقة (لا تُحفظ في Firestore
+        // إلا عند الضغط على "حفظ الحالة" - انظر saveCase):
+        //  - id: null تعني صورة جديدة لم تُرفَع بعد إلى Firestore
+        //  - id: معرّف وثيقة موجودة فعلاً ضمن المجموعة الفرعية xrays الخاصة بالحالة
+        let currentXRayEntries = [];
+        let pendingXRayDeletions = []; // معرّفات صور محذوفة أثناء هذه الجلسة تحتاج حذفاً فعلياً عند الحفظ
+
+        // يضيف إلى batch حذفَ حالة سريرية واحدة بكل صورها الشعاعية (المجموعة الفرعية xrays)
+        // Firestore لا يحذف المجموعات الفرعية تلقائياً عند حذف الوثيقة الأم، لذا يجب تفريغها يدوياً
+        async function addCaseDeletionsToBatch(batch, uid, caseId) {
+            const caseRef = db.collection('students').doc(uid).collection('cases').doc(caseId);
+            try {
+                const xraysSnap = await caseRef.collection('xrays').get();
+                xraysSnap.forEach(d => batch.delete(d.ref));
+            } catch (err) {
+                console.error('تعذر جلب صور الحالة لحذفها:', err);
+            }
+            batch.delete(caseRef);
+        }
+
+        function renderCases() {
+            const cases = casesCache;
+            const filterStatus = document.getElementById('filterCaseStatus')?.value || 'ALL';
+            const list = document.getElementById('casesList');
+            list.innerHTML = '';
+
+            const filtered = cases.filter(c => filterStatus === 'ALL' || c.status === filterStatus);
+
+            if (filtered.length === 0) {
+                list.innerHTML = '<p class="col-span-full text-center text-slate-400 py-8 text-sm">لا توجد حالات سريرية مسجلة.</p>';
+                return;
+            }
+
+            filtered.forEach(c => {
+                const card = document.createElement('div');
+                card.className = 'bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between space-y-3';
+                card.innerHTML = `
+                    <div>
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="font-bold text-slate-800 text-sm">${escapeHtml(c.title)}</h3>
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${getStatusBadgeClass(c.status)}">${escapeHtml(c.status)}</span>
+                        </div>
+                        <p class="text-xs text-slate-500">المريض: <strong class="text-slate-700">${escapeHtml(c.patientName)}</strong> | السن: <strong class="text-slate-700">${escapeHtml(c.tooth)}</strong></p>
+                        <p class="text-xs text-slate-500 mt-1">التخصص: <span class="text-teal-700 font-semibold">${escapeHtml(c.subject)}</span></p>
+                        ${c.diagnosis ? `<p class="text-xs text-slate-600 bg-slate-50 p-2 rounded mt-2"><strong>التشخيص:</strong> ${escapeHtml(c.diagnosis)}</p>` : ''}
+                    </div>
+                    <div class="flex gap-2 pt-2 border-t border-slate-100 justify-end">
+                        <button onclick="editCase('${c.id}')" class="text-xs font-semibold text-teal-600 hover:text-teal-800 border border-teal-200 bg-teal-50 px-3 py-1 rounded-lg">تعديل / تفاصيل</button>
+                        <button onclick="deleteCase('${c.id}')" class="text-xs font-semibold text-rose-600 hover:text-rose-800 border border-rose-200 bg-rose-50 px-2 py-1 rounded-lg"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                    </div>
+                `;
+                list.appendChild(card);
+            });
+            lucide.createIcons();
+        }
+
+        function setupCaseModalLogic() {
+            // Populate patient dropdown in case modal
+            const patients = patientsCache;
+            const select = document.getElementById('cPatientSelect');
+            const previouslySelected = select.value;
+            select.innerHTML = '<option value="">اختر المريض...</option>';
+            patients.forEach(p => {
+                select.innerHTML += `<option value="${p.id}" data-subject="${escapeHtml(p.subject)}" data-name="${escapeHtml(p.name)}">${escapeHtml(p.name)} (${escapeHtml(p.subject)})</option>`;
+            });
+            // الحفاظ على اختيار المريض الحالي إن كانت نافذة الحالة مفتوحة أثناء تحديث القائمة
+            if (previouslySelected) select.value = previouslySelected;
+        }
+
+        function onCasePatientChange() {
+            const select = document.getElementById('cPatientSelect');
+            const opt = select.options[select.selectedIndex];
+            document.getElementById('cSubject').value = opt.getAttribute('data-subject') || '';
+        }
+
+        async function openCaseModal(caseId = null) {
+            const patientsExist = patientsCache.length > 0;
+            if (!caseId && !patientsExist) {
+                alert('يجب إضافة مريض واحد على الأقل قبل إضافة حالة سريرية جديدة.');
+                return;
+            }
+            setupCaseModalLogic();
+            document.getElementById('caseForm').reset();
+            currentXRayEntries = [];
+            pendingXRayDeletions = [];
+            document.getElementById('xrayPreviewContainer').innerHTML = '';
+            document.getElementById('cId').value = '';
+            document.getElementById('caseModalTitle').textContent = caseId ? 'تعديل بيانات الحالة السريرية' : 'إضافة حالة سريرية جديدة';
+
+            if (caseId) {
+                const c = casesCache.find(item => item.id === caseId);
+                if (c) {
+                    document.getElementById('cId').value = c.id;
+                    document.getElementById('cTitle').value = c.title || '';
+                    document.getElementById('cPatientSelect').value = c.patientId || '';
+                    document.getElementById('cSubject').value = c.subject || '';
+                    document.getElementById('cTooth').value = c.tooth || '';
+                    document.getElementById('cStatus').value = c.status || 'مخططة';
+                    document.getElementById('cComplaint').value = c.complaint || '';
+                    document.getElementById('cDiagnosis').value = c.diagnosis || '';
+                    document.getElementById('cPlan').value = c.plan || '';
+                    document.getElementById('cProcedure').value = c.procedure || '';
+                    document.getElementById('cMaterials').value = c.materials || '';
+                    document.getElementById('cComplications').value = c.complications || '';
+                    document.getElementById('cStartDate').value = c.startDate || '';
+                    document.getElementById('cEndDate').value = c.endDate || '';
+                    document.getElementById('cFollowUp').value = c.followUp || '';
+                    document.getElementById('cNotes').value = c.notes || '';
+
+                    // تحميل الصور الشعاعية المحفوظة فعلياً لهذه الحالة من Firestore
+                    try {
+                        const xraysSnap = await db.collection('students').doc(currentUser.uid)
+                            .collection('cases').doc(caseId).collection('xrays').get();
+                        currentXRayEntries = xraysSnap.docs.map(d => ({ id: d.id, data: d.data().data }));
+                        renderXRayPreviews();
+                    } catch (err) {
+                        console.error('تعذر تحميل الصور الشعاعية للحالة:', err);
+                    }
+                }
+            }
+
+            document.getElementById('caseModal').classList.remove('hidden');
+            document.getElementById('caseModal').classList.add('flex');
+        }
+
+        function closeCaseModal() {
+            document.getElementById('caseModal').classList.add('hidden');
+            document.getElementById('caseModal').classList.remove('flex');
+            currentXRayEntries = [];
+            pendingXRayDeletions = [];
+        }
+
+        function handleXRayUpload(e) {
+            const files = Array.from(e.target.files || []);
+            if (files.length === 0) return;
+            if (!isLicenseActive()) {
+                e.target.value = '';
+                showUpgradeModal('رفع الصور الشعاعية متاح فقط بعد تفعيل الحساب.');
+                return;
+            }
+            let pending = files.length;
+            let hadError = false;
+            files.forEach(file => {
+                compressImageFile(file, (compressedDataUrl) => {
+                    if (compressedDataUrl) {
+                        currentXRayEntries.push({ id: null, data: compressedDataUrl });
+                    } else {
+                        hadError = true;
+                    }
+                    pending--;
+                    if (pending === 0) {
+                        renderXRayPreviews();
+                        e.target.value = ''; // إعادة تعيين حقل الرفع للسماح برفع نفس الملف مرة أخرى إن لزم
+                        if (hadError) {
+                            alert('تعذر تحميل واحدة أو أكثر من الصور (قد يكون الملف تالفاً أو غير مدعوم).');
+                        }
+                    }
+                });
+            });
+        }
+
+        // يضغط الصورة (تصغير الأبعاد + تقليل الجودة) قبل تخزينها، لتقليل حجمها قدر الإمكان
+        // ولتفادي حدود حجم الوثيقة القصوى في Firestore (1 ميغابايت لكل وثيقة).
+        // يستدعي callback(null) عند فشل القراءة أو التحميل بدل ترك العملية معلَّقة صامتة
+        function compressImageFile(file, callback) {
+            const reader = new FileReader();
+            reader.onerror = function() {
+                console.error('تعذر قراءة ملف الصورة:', file && file.name);
+                callback(null);
+            };
+            reader.onload = function(evt) {
+                const img = new Image();
+                img.onerror = function() {
+                    console.error('تعذر تحميل الصورة (ملف تالف أو غير مدعوم):', file && file.name);
+                    callback(null);
+                };
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width, height = img.height;
+                    const MAX_WIDTH = 1000;
+                    if (width > MAX_WIDTH) {
+                        height = Math.round(height * (MAX_WIDTH / width));
+                        width = MAX_WIDTH;
+                    }
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    callback(canvas.toDataURL('image/jpeg', 0.6));
+                };
+                img.src = evt.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function renderXRayPreviews() {
+            const container = document.getElementById('xrayPreviewContainer');
+            container.innerHTML = '';
+            currentXRayEntries.forEach((entry, idx) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'relative shrink-0 group';
+                wrapper.innerHTML = `
+                    <img src="${entry.data}" class="w-16 h-16 object-cover rounded border border-slate-200 cursor-pointer hover:opacity-90" onclick="openXrayLightbox('${idx}')">
+                    <button type="button" onclick="removeXray(${idx})" title="حذف الصورة" class="absolute -top-1.5 -right-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-5 h-5 flex items-center justify-center text-[11px] shadow">✕</button>
+                `;
+                container.appendChild(wrapper);
+            });
+        }
+
+        // تكبير صورة شعاعية معينة من المعاينة (يقبل الرقم التسلسلي idx بصيغة نصية أو رقمية)
+        function openXrayLightbox(idx) {
+            const entry = currentXRayEntries[idx];
+            if (!entry) return;
+            document.getElementById('xrayLightboxImg').src = entry.data;
+            const lightbox = document.getElementById('xrayLightbox');
+            lightbox.classList.remove('hidden');
+            lightbox.classList.add('flex');
+        }
+
+        function closeXrayLightbox() {
+            const lightbox = document.getElementById('xrayLightbox');
+            lightbox.classList.add('hidden');
+            lightbox.classList.remove('flex');
+            document.getElementById('xrayLightboxImg').src = '';
+        }
+
+        // حذف صورة شعاعية واحدة من معاينة نافذة الحالة الحالية. إن كانت الصورة محفوظة فعلاً
+        // في Firestore (لها id)، لا تُحذف فوراً بل تُعلَّم للحذف الفعلي عند الضغط على "حفظ
+        // الحالة" - تماماً كبقية حقول النموذج التي لا تُحفظ إلا عند التأكيد
+        function removeXray(idx) {
+            showConfirmDialog('هل أنت متأكد من حذف هذه الصورة الشعاعية؟', () => {
+                const entry = currentXRayEntries[idx];
+                if (entry && entry.id) {
+                    pendingXRayDeletions.push(entry.id);
+                }
+                currentXRayEntries.splice(idx, 1);
+                renderXRayPreviews();
+            });
+        }
+
+        async function saveCase(e) {
+            e.preventDefault();
+            const patientSelect = document.getElementById('cPatientSelect');
+            if (!patientSelect.value) {
+                alert('يرجى اختيار المريض.');
+                return;
+            }
+            const existingCaseId = document.getElementById('cId').value;
+            const isNew = !existingCaseId;
+            const caseId = existingCaseId || ('c_' + Date.now());
+            const patientName = patientSelect.options[patientSelect.selectedIndex].getAttribute('data-name');
+
+            const caseData = {
+                title: document.getElementById('cTitle').value.trim(),
+                patientId: patientSelect.value,
+                patientName: patientName,
+                subject: document.getElementById('cSubject').value,
+                tooth: document.getElementById('cTooth').value.trim(),
+                status: document.getElementById('cStatus').value,
+                complaint: document.getElementById('cComplaint').value.trim(),
+                diagnosis: document.getElementById('cDiagnosis').value.trim(),
+                plan: document.getElementById('cPlan').value.trim(),
+                procedure: document.getElementById('cProcedure').value.trim(),
+                materials: document.getElementById('cMaterials').value.trim(),
+                complications: document.getElementById('cComplications').value.trim(),
+                startDate: document.getElementById('cStartDate').value,
+                endDate: document.getElementById('cEndDate').value,
+                followUp: document.getElementById('cFollowUp').value,
+                notes: document.getElementById('cNotes').value.trim()
+            };
+
+            // تحقق منطقي بسيط من ترتيب التواريخ قبل الحفظ
+            if (caseData.startDate && caseData.endDate && caseData.endDate < caseData.startDate) {
+                alert('تاريخ الانتهاء لا يمكن أن يسبق تاريخ البدء.');
+                return;
+            }
+            if (caseData.startDate && caseData.followUp && caseData.followUp < caseData.startDate) {
+                alert('موعد المتابعة لا يمكن أن يسبق تاريخ بدء الحالة.');
+                return;
+            }
+
+            // فحص الحد المجاني من آخر عدّاد معروف محلياً عند إضافة حالة جديدة فقط (يعمل
+            // دون إنترنت). فحص سريع للواجهة، والفحص الحاسم سيكون في قاعدة الأمان لاحقاً
+            if (isNew) {
+                const counters = (studentProfile && studentProfile.counters) || { patients: 0, cases: 0 };
+                if (!isLicenseActive() && (counters.cases || 0) >= FREE_CASE_LIMIT) {
+                    closeCaseModal();
+                    showUpgradeModal(`لقد وصلت إلى الحد الأقصى (${FREE_CASE_LIMIT} حالات سريرية) في النسخة المجانية. أدخل كود تفعيل لإضافة عدد غير محدود من الحالات.`);
+                    return;
+                }
+            }
+
+            if (isNew) caseData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+
+            const submitBtn = document.getElementById('caseForm').querySelector('button[type="submit"]');
+            if (submitBtn) submitBtn.disabled = true;
+
+            try {
+                const uid = currentUser.uid;
+                const studentRef = db.collection('students').doc(uid);
+                const caseRef = studentRef.collection('cases').doc(caseId);
+                const batch = db.batch();
+
+                if (isNew) {
+                    batch.set(studentRef, {
+                        counters: { cases: firebase.firestore.FieldValue.increment(1) }
+                    }, { merge: true });
+                }
+
+                batch.set(caseRef, caseData, { merge: !isNew });
+
+                // حذف الصور التي أُزيلت أثناء هذه الجلسة
+                pendingXRayDeletions.forEach(delId => {
+                    batch.delete(caseRef.collection('xrays').doc(delId));
+                });
+                // إضافة الصور الجديدة فقط (التي ليس لها معرّف Firestore بعد)
+                currentXRayEntries.filter(x => !x.id).forEach(x => {
+                    const newRef = caseRef.collection('xrays').doc();
+                    batch.set(newRef, { data: x.data, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                });
+
+                await batch.commit();
+
+                // مزامنة موعد المتابعة التلقائي مع جدول المواعيد إن طُلب ذلك
+                if (document.getElementById('cSyncAppointment').checked && caseData.followUp) {
+                    await db.collection('students').doc(uid).collection('appointments').add({
+                        patientId: caseData.patientId,
+                        patientName: caseData.patientName,
+                        date: caseData.followUp,
+                        time: '09:00',
+                        notes: `متابعة حالة: ${caseData.title}`,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+
+                closeCaseModal();
+            } catch (err) {
+                alert('تعذر حفظ الحالة، تحقق من اتصالك بالإنترنت وحاول مرة أخرى.');
+            }
+            if (submitBtn) submitBtn.disabled = false;
+        }
+
+        function editCase(id) {
+            openCaseModal(id);
+        }
+
+        function deleteCase(id) {
+            showConfirmDialog('هل أنت متأكد من حذف هذه الحالة السريرية؟', async () => {
+                try {
+                    const uid = currentUser.uid;
+                    const batch = db.batch();
+                    await addCaseDeletionsToBatch(batch, uid, id);
+                    batch.set(db.collection('students').doc(uid), {
+                        counters: { cases: firebase.firestore.FieldValue.increment(-1) }
+                    }, { merge: true });
+                    await batch.commit();
+                } catch (err) {
+                    alert('تعذر حذف الحالة: ' + err.message);
+                }
+            });
+        }
+
+        // REQUIREMENTS MANAGEMENT
+        function renderRequirements() {
+            const reqs = requirementsCache;
+            const list = document.getElementById('requirementsList');
+            list.innerHTML = '';
+
+            reqs.forEach((r, idx) => {
+                const percent = r.goal > 0 ? Math.min(100, Math.round((r.completed / r.goal) * 100)) : 0;
+                const card = document.createElement('div');
+                card.className = 'bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3';
+                card.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <h3 class="font-bold text-slate-800 text-sm">${escapeHtml(r.subject)}</h3>
+                        <span class="text-xs font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded">${percent}%</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-2">
+                        <div class="bg-teal-600 h-2 rounded-full transition-all" style="width: ${percent}%"></div>
+                    </div>
+                    <div class="flex justify-between items-center text-xs text-slate-600 pt-1">
+                        <span class="flex items-center gap-1.5">
+                            المنجز: <strong class="text-slate-800">${r.completed}</strong> /
+                            <input type="number" min="0" value="${r.goal}" onchange="updateReqGoal(${idx}, this.value)" class="w-14 border border-slate-200 rounded px-1.5 py-0.5 text-xs text-center focus:outline-none focus:ring-2 focus:ring-teal-500" title="الهدف المطلوب">
+                        </span>
+                        <div class="flex gap-1">
+                            <button onclick="updateReqCount(${idx}, 1)" class="bg-teal-600 text-white w-6 h-6 rounded flex items-center justify-center font-bold text-sm">+</button>
+                            <button onclick="updateReqCount(${idx}, -1)" class="bg-slate-200 text-slate-700 w-6 h-6 rounded flex items-center justify-center font-bold text-sm">-</button>
+                        </div>
+                    </div>
+                `;
+                list.appendChild(card);
+            });
+        }
+
+        async function updateReqCount(index, change) {
+            const req = requirementsCache[index];
+            if (!req) return;
+            const newVal = Math.max(0, (req.completed || 0) + change);
+            try {
+                await db.collection('students').doc(currentUser.uid).collection('requirements').doc(req.id).update({ completed: newVal });
+            } catch (err) {
+                console.error('تعذر تحديث العدد المنجز:', err);
+                alert('تعذر حفظ التحديث، تحقق من اتصالك بالإنترنت وحاول مرة أخرى.');
+                renderRequirements(); // إعادة عرض القيمة الفعلية المخزَّنة (لم تتغيّر الواجهة تلقائياً هنا أصلاً، لكن تحسباً)
+            }
+        }
+
+        // يسمح للطالب بتحديد/تعديل الهدف (goal) المطلوب لكل مادة سريرية بشكل مباشر
+        async function updateReqGoal(index, value) {
+            const req = requirementsCache[index];
+            if (!req) return;
+            const goal = Math.max(0, parseInt(value, 10) || 0);
+            try {
+                await db.collection('students').doc(currentUser.uid).collection('requirements').doc(req.id).update({ goal });
+            } catch (err) {
+                console.error('تعذر تحديث الهدف:', err);
+                alert('تعذر حفظ الهدف الجديد، تحقق من اتصالك بالإنترنت وحاول مرة أخرى.');
+                renderRequirements(); // إعادة عرض الهدف المخزَّن فعلياً بدل القيمة التي كتبها المستخدم ولم تُحفظ
+            }
+        }
+
+        // SCHEDULE MANAGEMENT
+        function renderSchedule() {
+            const appointments = appointmentsCache;
+            const todayStr = getLocalDateStr(new Date());
+
+            const todayList = document.getElementById('todayAppointmentsList');
+            const allList = document.getElementById('allAppointmentsList');
+            todayList.innerHTML = '';
+            allList.innerHTML = '';
+
+            const todayApps = appointments.filter(a => a.date === todayStr);
+
+            if (todayApps.length === 0) {
+                todayList.innerHTML = '<p class="text-xs text-teal-700">لا توجد مواعيد مسجلة اليوم.</p>';
+            } else {
+                todayApps.forEach(a => {
+                    todayList.innerHTML += `
+                        <div class="bg-white p-3 rounded-lg shadow-sm border border-teal-100 text-xs">
+                            <p class="font-bold text-slate-800">${escapeHtml(a.patientName)}</p>
+                            <p class="text-slate-500">${escapeHtml(a.time)} - ${escapeHtml(a.notes || '')}</p>
+                        </div>
+                    `;
+                });
+            }
+
+            if (appointments.length === 0) {
+                allList.innerHTML = '<p class="text-xs text-slate-400 py-4 text-center">لا توجد مواعيد قادمة.</p>';
+            } else {
+                appointments.slice().sort((a,b) => {
+                    const dateDiff = new Date(a.date) - new Date(b.date);
+                    if (dateDiff !== 0) return dateDiff;
+                    return (a.time || '').localeCompare(b.time || ''); // فرز ثانوي بالوقت لمواعيد اليوم نفسه
+                }).forEach(a => {
+                    allList.innerHTML += `
+                        <div class="py-3 flex justify-between items-center text-xs">
+                            <div>
+                                <p class="font-bold text-slate-800 text-sm">${escapeHtml(a.patientName)}</p>
+                                <p class="text-slate-500">${escapeHtml(a.date)} عند الساعة ${escapeHtml(a.time)} ${a.notes ? `(${escapeHtml(a.notes)})` : ''}</p>
+                            </div>
+                            <button onclick="deleteAppointment('${a.id}')" class="text-rose-500 hover:text-rose-700"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </div>
+                    `;
+                });
+            }
+            lucide.createIcons();
+        }
+
+        function openAppointmentModal() {
+            const patients = patientsCache;
+            if (patients.length === 0) {
+                alert('يجب إضافة مريض واحد على الأقل قبل حجز موعد.');
+                return;
+            }
+            const select = document.getElementById('appPatientSelect');
+            select.innerHTML = '<option value="">اختر المريض...</option>';
+            patients.forEach(p => {
+                select.innerHTML += `<option value="${p.id}" data-name="${escapeHtml(p.name)}">${escapeHtml(p.name)}</option>`;
+            });
+
+            document.getElementById('appointmentForm').reset();
+            document.getElementById('appDate').value = getLocalDateStr(new Date());
+            document.getElementById('appointmentModal').classList.remove('hidden');
+            document.getElementById('appointmentModal').classList.add('flex');
+        }
+
+        function closeAppointmentModal() {
+            document.getElementById('appointmentModal').classList.add('hidden');
+            document.getElementById('appointmentModal').classList.remove('flex');
+        }
+
+        async function saveAppointment(e) {
+            e.preventDefault();
+            const select = document.getElementById('appPatientSelect');
+            if (!select.value) {
+                alert('يرجى اختيار المريض.');
+                return;
+            }
+            const patientName = select.options[select.selectedIndex].getAttribute('data-name');
+            try {
+                await db.collection('students').doc(currentUser.uid).collection('appointments').add({
+                    patientId: select.value,
+                    patientName: patientName,
+                    date: document.getElementById('appDate').value,
+                    time: document.getElementById('appTime').value,
+                    notes: document.getElementById('appNotes').value.trim(),
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                closeAppointmentModal();
+                // renderSchedule() و renderHomeTodayAppointments() ستُستدعيان تلقائياً عبر المستمع
+            } catch (err) {
+                alert('تعذر حفظ الموعد، تحقق من اتصالك بالإنترنت وحاول مرة أخرى.');
+            }
+        }
+
+        function deleteAppointment(id) {
+            showConfirmDialog('هل أنت متأكد من حذف هذا الموعد؟', () => {
+                db.collection('students').doc(currentUser.uid).collection('appointments').doc(id).delete()
+                    .catch(err => alert('تعذر حذف الموعد: ' + err.message));
+            });
+        }
+
+        // ODONTOGRAM INTERACTIVE SYSTEM
+        let currentOdontogramPatientId = null;
+
+        function openOdontogram(patientId) {
+            if (!isLicenseActive()) {
+                showUpgradeModal('المخطط السني التفاعلي متاح فقط بعد تفعيل الحساب.');
+                return;
+            }
+            currentOdontogramPatientId = patientId;
+            const p = patientsCache.find(item => item.id === patientId);
+            if (!p) return;
+
+            document.getElementById('activePatientName').textContent = p.name;
+            document.getElementById('activePatientMeta').textContent = `العمر: ${p.age} سنة | المادة: ${p.subject}`;
+            
+            switchTab('odontogram');
+            loadPatientOdontogram(p);
+        }
+
+        function handlePrintClick() {
+            if (!isLicenseActive()) {
+                showUpgradeModal('طباعة التقرير بصيغة PDF متاحة فقط بعد تفعيل الحساب.');
+                return;
+            }
+            window.print();
+        }
+
+        function renderUpperArch() {
+            const teeth = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
+            const container = document.getElementById('upperArchContainer');
+            container.innerHTML = '';
+            teeth.forEach(num => container.appendChild(createToothSVG(num)));
+        }
+
+        function renderLowerArch() {
+            const teeth = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
+            const container = document.getElementById('lowerArchContainer');
+            container.innerHTML = '';
+            teeth.forEach(num => container.appendChild(createToothSVG(num)));
+        }
+
+        function createToothSVG(toothNum) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'flex flex-col items-center gap-1';
+            wrapper.innerHTML = `
+                <span class="text-[11px] font-bold text-slate-500">${toothNum}</span>
+                <svg width="36" height="36" viewBox="0 0 100 100" class="cursor-pointer border border-slate-300 rounded bg-slate-50 hover:border-teal-500" data-tooth="${toothNum}">
+                    <!-- Top / Occlusal-Incisal -->
+                    <polygon points="20,20 80,20 65,35 35,35" fill="#f8fafc" stroke="#64748b" stroke-width="2" data-surface="T"/>
+                    <!-- Right / Distal -->
+                    <polygon points="80,20 80,80 65,65 65,35" fill="#f8fafc" stroke="#64748b" stroke-width="2" data-surface="R"/>
+                    <!-- Bottom / Cervical -->
+                    <polygon points="20,80 80,80 65,65 35,65" fill="#f8fafc" stroke="#64748b" stroke-width="2" data-surface="B"/>
+                    <!-- Left / Mesial -->
+                    <polygon points="20,20 20,80 35,65 35,35" fill="#f8fafc" stroke="#64748b" stroke-width="2" data-surface="L"/>
+                    <!-- Center / Center -->
+                    <polygon points="35,35 65,35 65,65 35,65" fill="#f8fafc" stroke="#64748b" stroke-width="2" data-surface="C"/>
+                </svg>
+            `;
+
+            wrapper.querySelectorAll('polygon').forEach(poly => {
+                poly.addEventListener('click', (e) => onSurfaceClick(toothNum, e.target.getAttribute('data-surface'), e.target));
+            });
+
+            return wrapper;
+        }
+
+        async function onSurfaceClick(toothNum, surface, element) {
+            if (!currentOdontogramPatientId) return;
+            const selectedStatus = document.querySelector('input[name="toolStatus"]:checked').value;
+            
+            const colorMap = {
+                'caries': '#ef4444', // Red
+                'filled': '#3b82f6', // Blue
+                'endo': '#10b981',   // Green
+                'extracted': '#1e293b', // Dark Slate
+                'clear': '#f8fafc'   // Default
+            };
+            const color = colorMap[selectedStatus];
+            const previousColor = element.getAttribute('fill'); // للتراجع البصري إن فشل الحفظ فعلياً
+
+            element.setAttribute('fill', color);
+
+            // حفظ الحالة مباشرة في وثيقة المريض على Firestore (مسار متداخل باستخدام النقاط)
+            try {
+                const fieldPath = `odontogram.${toothNum}.${surface}`;
+                await db.collection('students').doc(currentUser.uid).collection('patients')
+                    .doc(currentOdontogramPatientId).update({ [fieldPath]: color });
+            } catch (err) {
+                console.error('تعذر حفظ حالة السن:', err);
+                element.setAttribute('fill', previousColor); // التراجع: لا نترك السن ملوَّناً بصرياً بلا حفظ فعلي
+                alert('تعذر حفظ حالة السن، تحقق من اتصالك بالإنترنت وحاول مرة أخرى.');
+            }
+        }
+
+        function loadPatientOdontogram(patient) {
+            // Reset colors first
+            document.querySelectorAll('polygon').forEach(poly => poly.setAttribute('fill', '#f8fafc'));
+
+            if (patient.odontogram) {
+                Object.keys(patient.odontogram).forEach(toothNum => {
+                    const toothSurfaces = patient.odontogram[toothNum];
+                    Object.keys(toothSurfaces).forEach(surface => {
+                        const poly = document.querySelector(`svg[data-tooth="${toothNum}"] polygon[data-surface="${surface}"]`);
+                        if (poly) poly.setAttribute('fill', toothSurfaces[surface]);
+                    });
+                });
+            }
+        }
+
+        // HELPERS
+        function getStatusBadgeClass(status) {
+            switch(status) {
+                case 'مكتملة': return 'bg-emerald-100 text-emerald-800';
+                case 'قيد المعالجة': return 'bg-amber-100 text-amber-800';
+                case 'ملغاة': return 'bg-rose-100 text-rose-800';
+                default: return 'bg-slate-100 text-slate-700';
+            }
+        }
+    </script>
+</body>
+</html>
