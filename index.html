@@ -1663,48 +1663,72 @@
             }
 
             if (btn) { btn.disabled = true; }
+            const uid = currentUser.uid;
+            const studentRef = db.collection('students').doc(uid);
+
+            // الخطوة 1 (حرجة): إضافة المريض نفسه - يجب أن تنجح دائماً إن كان ضمن الحد
+            // المسموح (الفحص أعلاه) أو مفعَّلاً. مفصولة عن تحديث العدّاد أدناه لضمان
+            // نجاحها بغض النظر عن أي تعثّر عابر في تلك الخطوة الثانوية المحاسبية فقط
             try {
-                const uid = currentUser.uid;
-                const studentRef = db.collection('students').doc(uid);
-                const batch = db.batch();
-                const newPatientRef = studentRef.collection('patients').doc();
-                batch.set(newPatientRef, newPatient);
-                batch.set(studentRef, {
-                    counters: { patients: firebase.firestore.FieldValue.increment(1) }
-                }, { merge: true });
-                await batch.commit();
+                await studentRef.collection('patients').add(newPatient);
                 closePatientModal();
                 // renderPatients() سيُستدعى تلقائياً عبر المستمع (onSnapshot) فور نجاح الحفظ
             } catch (err) {
-                alert('تعذر حفظ المريض، تحقق من اتصالك بالإنترنت وحاول مرة أخرى.');
+                alert(`تعذر حفظ المريض [${err.code || 'unknown'}]: ${err.message}`);
+                if (btn) { btn.disabled = false; }
+                return;
+            }
+
+            // الخطوة 2 (ثانوية، محاسبية فقط): تحديث العدّاد
+            try {
+                await studentRef.set({
+                    counters: { patients: firebase.firestore.FieldValue.increment(1) }
+                }, { merge: true });
+            } catch (err) {
+                console.warn('تم حفظ المريض بنجاح، لكن تعذر تحديث العدّاد:', err.code, err.message);
             }
             if (btn) { btn.disabled = false; }
         }
 
         function deletePatient(pId) {
             showConfirmDialog('هل أنت متأكد من حذف هذا المريض وكل الحالات المربوطة به؟', async () => {
+                const uid = currentUser.uid;
+                const studentRef = db.collection('students').doc(uid);
+                let deletedCasesCount = 0;
+
+                // الخطوة 1 (حرجة، يجب أن تنجح دائماً): حذف المريض وكل حالاته وصورها.
+                // لا شرط معقّد على أي من هذه العمليات - فقط ملكية الحساب - فلا يوجد سبب
+                // منطقي لفشلها. مفصولة تماماً عن تحديث العدّاد أدناه لضمان نجاحها دائماً
+                // بغض النظر عن أي تعثّر عابر في تلك الخطوة الثانوية
                 try {
-                    const uid = currentUser.uid;
-                    const studentRef = db.collection('students').doc(uid);
                     const batch = db.batch();
                     batch.delete(studentRef.collection('patients').doc(pId));
 
                     const casesSnap = await studentRef.collection('cases')
                         .where('patientId', '==', pId).get();
+                    deletedCasesCount = casesSnap.size;
                     for (const caseDoc of casesSnap.docs) {
                         await addCaseDeletionsToBatch(batch, uid, caseDoc.id);
                     }
 
-                    batch.set(studentRef, {
-                        counters: {
-                            patients: firebase.firestore.FieldValue.increment(-1),
-                            cases: firebase.firestore.FieldValue.increment(-casesSnap.size)
-                        }
-                    }, { merge: true });
-
                     await batch.commit();
                 } catch (err) {
                     alert(`تعذر حذف المريض [${err.code || 'unknown'}]: ${err.message}`);
+                    return; // لا نحاول تحديث العدّاد إن فشل الحذف الفعلي نفسه
+                }
+
+                // الخطوة 2 (ثانوية، محاسبية فقط): تحديث العدّاد. إن فشلت هذه الخطوة تحديداً
+                // لأي سبب، لا نُظهر أي خطأ للمستخدم - المريض والحالات حُذفوا فعلياً بنجاح
+                // فعلاً، وهذا ما يهمّه. مجرد تسجيل صامت في وحدة التحكم للمراجعة الفنية فقط
+                try {
+                    await studentRef.set({
+                        counters: {
+                            patients: firebase.firestore.FieldValue.increment(-1),
+                            cases: firebase.firestore.FieldValue.increment(-deletedCasesCount)
+                        }
+                    }, { merge: true });
+                } catch (err) {
+                    console.warn('تم حذف المريض بنجاح، لكن تعذر تحديث العدّاد:', err.code, err.message);
                 }
             });
         }
@@ -2007,18 +2031,15 @@
             const submitBtn = document.getElementById('caseForm').querySelector('button[type="submit"]');
             if (submitBtn) submitBtn.disabled = true;
 
+            const uid = currentUser.uid;
+            const studentRef = db.collection('students').doc(uid);
+            const caseRef = studentRef.collection('cases').doc(caseId);
+
+            // الخطوة 1 (حرجة): حفظ الحالة نفسها وصورها الشعاعية - يجب أن تنجح دائماً.
+            // مفصولة عن تحديث العدّاد أدناه لضمان نجاحها بغض النظر عن أي تعثّر عابر في
+            // تلك الخطوة الثانوية المحاسبية فقط
             try {
-                const uid = currentUser.uid;
-                const studentRef = db.collection('students').doc(uid);
-                const caseRef = studentRef.collection('cases').doc(caseId);
                 const batch = db.batch();
-
-                if (isNew) {
-                    batch.set(studentRef, {
-                        counters: { cases: firebase.firestore.FieldValue.increment(1) }
-                    }, { merge: true });
-                }
-
                 batch.set(caseRef, caseData, { merge: !isNew });
 
                 // حذف الصور التي أُزيلت أثناء هذه الجلسة
@@ -2047,7 +2068,20 @@
 
                 closeCaseModal();
             } catch (err) {
-                alert('تعذر حفظ الحالة، تحقق من اتصالك بالإنترنت وحاول مرة أخرى.');
+                alert(`تعذر حفظ الحالة [${err.code || 'unknown'}]: ${err.message}`);
+                if (submitBtn) submitBtn.disabled = false;
+                return;
+            }
+
+            // الخطوة 2 (ثانوية، محاسبية فقط): تحديث العدّاد عند إضافة حالة جديدة فقط
+            if (isNew) {
+                try {
+                    await studentRef.set({
+                        counters: { cases: firebase.firestore.FieldValue.increment(1) }
+                    }, { merge: true });
+                } catch (err) {
+                    console.warn('تم حفظ الحالة بنجاح، لكن تعذر تحديث العدّاد:', err.code, err.message);
+                }
             }
             if (submitBtn) submitBtn.disabled = false;
         }
@@ -2058,16 +2092,25 @@
 
         function deleteCase(id) {
             showConfirmDialog('هل أنت متأكد من حذف هذه الحالة السريرية؟', async () => {
+                const uid = currentUser.uid;
+
+                // الخطوة 1 (حرجة): حذف الحالة وصورها - يجب أن تنجح دائماً
                 try {
-                    const uid = currentUser.uid;
                     const batch = db.batch();
                     await addCaseDeletionsToBatch(batch, uid, id);
-                    batch.set(db.collection('students').doc(uid), {
-                        counters: { cases: firebase.firestore.FieldValue.increment(-1) }
-                    }, { merge: true });
                     await batch.commit();
                 } catch (err) {
-                    alert('تعذر حذف الحالة: ' + err.message);
+                    alert(`تعذر حذف الحالة [${err.code || 'unknown'}]: ${err.message}`);
+                    return;
+                }
+
+                // الخطوة 2 (ثانوية، محاسبية فقط): تحديث العدّاد
+                try {
+                    await db.collection('students').doc(uid).set({
+                        counters: { cases: firebase.firestore.FieldValue.increment(-1) }
+                    }, { merge: true });
+                } catch (err) {
+                    console.warn('تم حذف الحالة بنجاح، لكن تعذر تحديث العدّاد:', err.code, err.message);
                 }
             });
         }
