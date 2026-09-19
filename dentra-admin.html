@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DENTRA - لوحة التحكم الإدارية</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap');
+        body { font-family: 'Cairo', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+    <!-- AUTH CHECK LOADER -->
+    <div id="authLoading" class="min-h-screen flex items-center justify-center p-4">
+        <p id="authLoadingText" class="text-sm text-slate-400">جارٍ التحقق من الحساب...</p>
+    </div>
+
+    <!-- LOGIN SCREEN (مشرف فقط - لا يوجد إنشاء حساب هنا) -->
+    <div id="authScreen" class="hidden min-h-screen flex items-center justify-center p-4 bg-slate-50">
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 w-full max-w-sm p-6 space-y-5">
+            <div class="text-center space-y-1">
+                <div class="w-12 h-12 rounded-xl bg-slate-800 text-white flex items-center justify-center text-xl font-bold mx-auto">D</div>
+                <h1 class="text-lg font-bold text-slate-800">لوحة تحكم DENTRA</h1>
+                <p class="text-xs text-slate-500">حساب المشرف فقط</p>
+            </div>
+            <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">البريد الإلكتروني</label>
+                    <input type="email" id="loginEmail" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">كلمة المرور</label>
+                    <input type="password" id="loginPassword" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500">
+                </div>
+                <p id="loginError" class="text-xs text-rose-600 min-h-[16px]"></p>
+                <button type="submit" id="loginSubmitBtn" class="w-full py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-semibold shadow">تسجيل الدخول</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- UNAUTHORIZED SCREEN (حساب صحيح لكنه ليس المشرف) -->
+    <div id="unauthorizedScreen" class="hidden min-h-screen flex items-center justify-center p-4 bg-slate-50">
+        <div class="text-center space-y-3 max-w-sm">
+            <div class="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+                <i data-lucide="shield-off" class="w-6 h-6"></i>
+            </div>
+            <h2 class="font-bold text-slate-800">هذا الحساب غير مخوَّل</h2>
+            <p class="text-sm text-slate-500">لوحة التحكم هذه مخصصة لحساب المشرف فقط.</p>
+            <button onclick="handleLogout()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-semibold">تسجيل الخروج</button>
+        </div>
+    </div>
+
+    <!-- MAIN DASHBOARD -->
+    <div id="appShell" class="hidden">
+        <header class="bg-slate-800 text-white shadow-lg sticky top-0 z-40">
+            <div class="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center font-bold">D</div>
+                    <b>لوحة تحكم DENTRA</b>
+                </div>
+                <button onclick="handleLogout()" class="text-xs border border-white/20 px-3 py-1.5 rounded-lg hover:bg-white/10 flex items-center gap-1.5">
+                    <i data-lucide="log-out" class="w-3.5 h-3.5"></i> تسجيل الخروج
+                </button>
+            </div>
+        </header>
+
+        <main class="max-w-5xl mx-auto px-4 py-6 space-y-6">
+
+            <!-- إحصائيات سريعة -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div class="bg-white p-4 rounded-xl border border-slate-200 text-center">
+                    <div id="statTotal" class="text-2xl font-bold text-slate-800">-</div>
+                    <div class="text-xs text-slate-500 mt-1">إجمالي الأكواد</div>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-slate-200 text-center">
+                    <div id="statUnused" class="text-2xl font-bold text-slate-500">-</div>
+                    <div class="text-xs text-slate-500 mt-1">غير مستخدَم</div>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-slate-200 text-center">
+                    <div id="statActive" class="text-2xl font-bold text-emerald-600">-</div>
+                    <div class="text-xs text-slate-500 mt-1">مُفعَّل</div>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-slate-200 text-center">
+                    <div id="statRevoked" class="text-2xl font-bold text-rose-500">-</div>
+                    <div class="text-xs text-slate-500 mt-1">مُلغى</div>
+                </div>
+            </div>
+
+            <!-- توليد دفعة أكواد جديدة -->
+            <div class="bg-white p-5 rounded-xl border border-slate-200 space-y-4">
+                <h2 class="font-bold text-slate-800 flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-5 h-5 text-slate-600"></i> توليد دفعة أكواد جديدة
+                </h2>
+                <form id="generateForm" onsubmit="handleGenerateCodes(event)" class="grid md:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">عدد الأكواد *</label>
+                        <input type="number" id="genCount" min="1" max="200" value="10" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">تاريخ انتهاء الدفعة *</label>
+                        <input type="date" id="genExpiresAt" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">تسمية الدفعة (اختياري)</label>
+                        <input type="text" id="genBatchLabel" placeholder="مثال: فصل خريف 2026" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500">
+                    </div>
+                    <div class="md:col-span-3">
+                        <button type="submit" id="generateSubmitBtn" class="w-full md:w-auto px-6 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-semibold shadow">توليد الأكواد</button>
+                    </div>
+                </form>
+
+                <!-- نتيجة التوليد -->
+                <div id="generatedResultBox" class="hidden border-t pt-4 space-y-2">
+                    <div class="flex justify-between items-center">
+                        <p class="text-sm font-semibold text-emerald-700">تم توليد <span id="generatedCount">0</span> كود بنجاح</p>
+                        <button onclick="copyGeneratedCodes()" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5">
+                            <i data-lucide="copy" class="w-3.5 h-3.5"></i> نسخ الكل
+                        </button>
+                    </div>
+                    <textarea id="generatedCodesText" readonly rows="6" class="w-full border rounded-lg px-3 py-2 text-xs font-mono bg-slate-50" dir="ltr"></textarea>
+                </div>
+            </div>
+
+            <!-- البحث والإدارة -->
+            <div class="bg-white p-5 rounded-xl border border-slate-200 space-y-4">
+                <div class="flex flex-col md:flex-row justify-between gap-3">
+                    <h2 class="font-bold text-slate-800 flex items-center gap-2">
+                        <i data-lucide="list" class="w-5 h-5 text-slate-600"></i> جميع الأكواد
+                    </h2>
+                    <div class="flex gap-2">
+                        <input type="text" id="searchCodesInput" oninput="renderCodesList()" placeholder="بحث بالكود أو تسمية الدفعة..." class="border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 w-full md:w-64">
+                        <select id="filterStatusSelect" onchange="renderCodesList()" class="border rounded-lg px-3 py-2 text-sm text-slate-600 focus:ring-2 focus:ring-slate-500">
+                            <option value="ALL">جميع الحالات</option>
+                            <option value="unused">غير مستخدَم</option>
+                            <option value="active">مُفعَّل</option>
+                            <option value="revoked">مُلغى</option>
+                        </select>
+                        <button onclick="loadCodes()" title="تحديث" class="border rounded-lg px-3 py-2 text-sm hover:bg-slate-50">
+                            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+                <div id="codesListContainer" class="space-y-2 max-h-[60vh] overflow-y-auto"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODERN CONFIRM DIALOG -->
+    <div id="confirmModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-[60]">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 space-y-4 text-center">
+            <p id="confirmModalMessage" class="text-sm text-slate-700 leading-6">هل أنت متأكد؟</p>
+            <div class="flex gap-2 pt-1">
+                <button type="button" onclick="closeConfirmModal()" class="flex-1 px-4 py-2 border rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-50">إلغاء</button>
+                <button type="button" onclick="confirmModalProceed()" class="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-semibold shadow">تأكيد</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // FIREBASE INITIALIZATION - نفس مشروع تطبيق الطلاب بالضبط
+        // ============================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyDK-4u3wmL4Ipov9RlnfNupIxR6C6thhQY",
+            authDomain: "dentra-clinical.firebaseapp.com",
+            projectId: "dentra-clinical",
+            storageBucket: "dentra-clinical.firebasestorage.app",
+            messagingSenderId: "630998875236",
+            appId: "1:630998875236:web:2fa4917066615dfcfe7371",
+            measurementId: "G-8N1XJVEHRT"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // UID حساب المشرف - يُستخدم فقط للفحص العرضي (تجربة استخدام أوضح)؛ الحماية
+        // الحقيقية غير القابلة للتجاوز موجودة في قواعد أمان Firestore نفسها (isAdmin())
+        const ADMIN_UID = 'YCq5chYle6OIoDGvpWBqYOJnViZ2';
+
+        let currentUser = null;
+        let codesCache = [];
+
+        function escapeHtml(value) {
+            if (value === null || value === undefined) return '';
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+        });
+
+        let _authResolved = false;
+        setTimeout(() => {
+            if (_authResolved) return;
+            const textEl = document.getElementById('authLoadingText');
+            if (textEl) textEl.textContent = 'تعذر التحقق من الحساب. تأكد من فتح الملف عبر رابط ويب (http/https) ومن اتصالك بالإنترنت، ثم أعد المحاولة.';
+        }, 10000);
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            const errEl = document.getElementById('loginError');
+            const btn = document.getElementById('loginSubmitBtn');
+            errEl.textContent = '';
+            btn.disabled = true; btn.textContent = 'جارٍ التحقق...';
+            try {
+                await auth.signInWithEmailAndPassword(email, password);
+            } catch (err) {
+                const map = {
+                    'auth/invalid-email': 'صيغة البريد الإلكتروني غير صحيحة',
+                    'auth/user-not-found': 'لا يوجد حساب بهذا البريد',
+                    'auth/wrong-password': 'كلمة المرور غير صحيحة',
+                    'auth/invalid-credential': 'البريد أو كلمة المرور غير صحيحة',
+                    'auth/network-request-failed': 'تعذر الاتصال، تحقق من الإنترنت'
+                };
+                errEl.textContent = map[err.code] || ('حدث خطأ: ' + (err.message || ''));
+            }
+            btn.disabled = false; btn.textContent = 'تسجيل الدخول';
+        }
+
+        function handleLogout() {
+            auth.signOut();
+        }
+
+        function showAuthScreen() {
+            _authResolved = true;
+            document.getElementById('authLoading').classList.add('hidden');
+            document.getElementById('unauthorizedScreen').classList.add('hidden');
+            document.getElementById('appShell').classList.add('hidden');
+            document.getElementById('authScreen').classList.remove('hidden');
+            document.getElementById('loginForm').reset();
+            document.getElementById('loginError').textContent = '';
+        }
+
+        function showUnauthorizedScreen() {
+            _authResolved = true;
+            document.getElementById('authLoading').classList.add('hidden');
+            document.getElementById('authScreen').classList.add('hidden');
+            document.getElementById('appShell').classList.add('hidden');
+            document.getElementById('unauthorizedScreen').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function showAppShell() {
+            _authResolved = true;
+            document.getElementById('authLoading').classList.add('hidden');
+            document.getElementById('authScreen').classList.add('hidden');
+            document.getElementById('unauthorizedScreen').classList.add('hidden');
+            document.getElementById('appShell').classList.remove('hidden');
+        }
+
+        auth.onAuthStateChanged(async (user) => {
+            if (!user) {
+                currentUser = null;
+                showAuthScreen();
+                return;
+            }
+            // فحص عرضي فقط لتجربة استخدام أوضح؛ الحماية الحقيقية في قواعد الأمان
+            if (user.uid !== ADMIN_UID) {
+                currentUser = null;
+                showUnauthorizedScreen();
+                return;
+            }
+            currentUser = user;
+            showAppShell();
+            lucide.createIcons();
+            initAdminApp();
+        });
+
+        function initAdminApp() {
+            // تعيين تاريخ افتراضي معقول (بعد 4 أشهر من اليوم) لحقل تاريخ الانتهاء
+            const d = new Date();
+            d.setMonth(d.getMonth() + 4);
+            document.getElementById('genExpiresAt').value = d.toISOString().slice(0, 10);
+            loadCodes();
+        }
+
+        // ============================================================
+        // MODERN CONFIRM DIALOG
+        // ============================================================
+        let _confirmCallback = null;
+        function showConfirmDialog(message, onConfirm) {
+            document.getElementById('confirmModalMessage').textContent = message;
+            _confirmCallback = onConfirm;
+            document.getElementById('confirmModal').classList.remove('hidden');
+            document.getElementById('confirmModal').classList.add('flex');
+        }
+        function closeConfirmModal() {
+            document.getElementById('confirmModal').classList.add('hidden');
+            document.getElementById('confirmModal').classList.remove('flex');
+            _confirmCallback = null;
+        }
+        function confirmModalProceed() {
+            const cb = _confirmCallback;
+            closeConfirmModal();
+            if (typeof cb === 'function') cb();
+        }
+
+        // ============================================================
+        // CODE GENERATION
+        // ============================================================
+        // استثناء الأحرف المتشابهة بصرياً (0/O, 1/I/L) لتسهيل كتابة الكود يدوياً من الطالب
+        const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+        function generateRandomCode() {
+            function randPart(len) {
+                let s = '';
+                for (let i = 0; i < len; i++) s += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+                return s;
+            }
+            return `DENTRA-${randPart(4)}-${randPart(4)}`;
+        }
+
+        async function handleGenerateCodes(e) {
+            e.preventDefault();
+            const count = parseInt(document.getElementById('genCount').value, 10);
+            const expiresAtStr = document.getElementById('genExpiresAt').value;
+            const batchLabel = document.getElementById('genBatchLabel').value.trim();
+            const btn = document.getElementById('generateSubmitBtn');
+
+            if (!count || count < 1 || count > 200) {
+                alert('عدد الأكواد يجب أن يكون بين 1 و200.');
+                return;
+            }
+            if (!expiresAtStr) {
+                alert('يرجى تحديد تاريخ انتهاء الدفعة.');
+                return;
+            }
+
+            btn.disabled = true; btn.textContent = 'جارٍ التوليد...';
+            try {
+                const expiresAt = firebase.firestore.Timestamp.fromDate(new Date(expiresAtStr + 'T23:59:59'));
+                const batch = db.batch();
+                const generated = [];
+                const usedInThisBatch = new Set();
+                let attempts = 0;
+
+                while (generated.length < count && attempts < count * 5) {
+                    attempts++;
+                    const code = generateRandomCode();
+                    if (usedInThisBatch.has(code)) continue;
+                    usedInThisBatch.add(code);
+                    const ref = db.collection('licenseCodes').doc(code);
+                    batch.set(ref, {
+                        status: 'unused',
+                        assignedToUid: null,
+                        deviceId: null,
+                        activatedAt: null,
+                        expiresAt: expiresAt,
+                        batchLabel: batchLabel,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    generated.push(code);
+                }
+
+                await batch.commit();
+
+                document.getElementById('generatedCount').textContent = generated.length;
+                document.getElementById('generatedCodesText').value = generated.join('\n');
+                document.getElementById('generatedResultBox').classList.remove('hidden');
+
+                loadCodes();
+            } catch (err) {
+                alert('تعذر توليد الأكواد: ' + err.message);
+            }
+            btn.disabled = false; btn.textContent = 'توليد الأكواد';
+        }
+
+        function copyGeneratedCodes() {
+            const textarea = document.getElementById('generatedCodesText');
+            textarea.select();
+            try {
+                navigator.clipboard.writeText(textarea.value);
+            } catch (err) {
+                document.execCommand('copy');
+            }
+        }
+
+        // ============================================================
+        // LISTING / SEARCH / MANAGEMENT
+        // ============================================================
+        async function loadCodes() {
+            try {
+                const snap = await db.collection('licenseCodes').orderBy('createdAt', 'desc').limit(500).get();
+                codesCache = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+                renderStats();
+                renderCodesList();
+            } catch (err) {
+                console.error('تعذر تحميل الأكواد:', err);
+                document.getElementById('codesListContainer').innerHTML =
+                    '<p class="text-center text-rose-500 text-sm py-6">تعذر تحميل الأكواد. تحقق من اتصالك بالإنترنت.</p>';
+            }
+        }
+
+        function renderStats() {
+            document.getElementById('statTotal').textContent = codesCache.length;
+            document.getElementById('statUnused').textContent = codesCache.filter(c => c.status === 'unused').length;
+            document.getElementById('statActive').textContent = codesCache.filter(c => c.status === 'active').length;
+            document.getElementById('statRevoked').textContent = codesCache.filter(c => c.status === 'revoked').length;
+        }
+
+        function statusBadge(status) {
+            const map = {
+                unused: 'bg-slate-100 text-slate-600',
+                active: 'bg-emerald-100 text-emerald-700',
+                revoked: 'bg-rose-100 text-rose-600'
+            };
+            const labels = { unused: 'غير مستخدَم', active: 'مُفعَّل', revoked: 'مُلغى' };
+            return `<span class="px-2 py-0.5 rounded text-[10px] font-bold ${map[status] || map.unused}">${labels[status] || status}</span>`;
+        }
+
+        function formatTimestamp(ts) {
+            if (!ts) return '-';
+            const d = ts.toDate ? ts.toDate() : new Date(ts);
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function renderCodesList() {
+            const search = (document.getElementById('searchCodesInput').value || '').trim().toUpperCase();
+            const filterStatus = document.getElementById('filterStatusSelect').value;
+            const container = document.getElementById('codesListContainer');
+
+            const filtered = codesCache.filter(c => {
+                const matchSearch = !search ||
+                    c.id.toUpperCase().includes(search) ||
+                    (c.batchLabel || '').toUpperCase().includes(search);
+                const matchStatus = filterStatus === 'ALL' || c.status === filterStatus;
+                return matchSearch && matchStatus;
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<p class="text-center text-slate-400 text-sm py-6">لا توجد أكواد مطابقة.</p>';
+                return;
+            }
+
+            container.innerHTML = filtered.map(c => `
+                <div class="border border-slate-200 rounded-lg p-3 flex flex-col md:flex-row md:items-center justify-between gap-2 text-sm">
+                    <div class="space-y-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="font-mono font-bold text-slate-800" dir="ltr">${escapeHtml(c.id)}</span>
+                            ${statusBadge(c.status)}
+                            ${c.batchLabel ? `<span class="text-[10px] text-slate-400">${escapeHtml(c.batchLabel)}</span>` : ''}
+                        </div>
+                        <div class="text-[11px] text-slate-500 flex flex-wrap gap-3">
+                            <span>الانتهاء: ${formatTimestamp(c.expiresAt)}</span>
+                            ${c.assignedToUid ? `<span dir="ltr">UID: ${escapeHtml(c.assignedToUid.slice(0, 12))}...</span>` : ''}
+                            ${c.deviceId ? `<span class="text-amber-600">مرتبط بجهاز</span>` : (c.status === 'active' ? `<span class="text-slate-400">بلا جهاز (قابل لإعادة التفعيل)</span>` : '')}
+                        </div>
+                    </div>
+                    <div class="flex gap-2 shrink-0">
+                        ${c.status === 'active' && c.deviceId ? `
+                            <button onclick="resetDevice('${c.id}')" class="text-xs bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-lg font-semibold">تصفير الجهاز</button>
+                        ` : ''}
+                        ${c.status !== 'revoked' ? `
+                            <button onclick="revokeCode('${c.id}')" class="text-xs bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-3 py-1.5 rounded-lg font-semibold">إلغاء</button>
+                        ` : ''}
+                        <button onclick="deleteCode('${c.id}')" class="text-xs bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200 px-3 py-1.5 rounded-lg font-semibold">حذف</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function resetDevice(code) {
+            showConfirmDialog(`تصفير الجهاز المرتبط بالكود ${code}؟ سيتمكن الطالب من تفعيله على جهاز جديد بنفس حسابه.`, async () => {
+                try {
+                    await db.collection('licenseCodes').doc(code).update({ deviceId: null });
+                    loadCodes();
+                } catch (err) {
+                    alert('تعذر تصفير الجهاز: ' + err.message);
+                }
+            });
+        }
+
+        function revokeCode(code) {
+            showConfirmDialog(`إلغاء الكود ${code} نهائياً؟ لا يمكن التراجع عن هذا الإجراء.`, async () => {
+                try {
+                    await db.collection('licenseCodes').doc(code).update({ status: 'revoked' });
+                    loadCodes();
+                } catch (err) {
+                    alert('تعذر إلغاء الكود: ' + err.message);
+                }
+            });
+        }
+
+        function deleteCode(code) {
+            showConfirmDialog(`حذف الكود ${code} نهائياً من القائمة؟ (يُفضَّل استخدام "إلغاء" بدل الحذف للاحتفاظ بسجلّ الأكواد)`, async () => {
+                try {
+                    await db.collection('licenseCodes').doc(code).delete();
+                    loadCodes();
+                } catch (err) {
+                    alert('تعذر حذف الكود: ' + err.message);
+                }
+            });
+        }
+    </script>
+</body>
+</html>
