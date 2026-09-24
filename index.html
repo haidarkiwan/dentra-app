@@ -30,6 +30,10 @@
             body { background: white !important; padding: 0 !important; }
             main { max-width: 100% !important; width: 100% !important; margin: 0 !important; }
             .print-only { display: block !important; }
+            /* عند طباعة تقرير حالة سريرية واحدة، نُخفي كل شيء آخر في الصفحة (بما فيها
+               النافذة المنبثقة نفسها) ونعرض فقط منطقة الطباعة المخصَّصة */
+            body.printing-case > *:not(#casePrintArea) { display: none !important; }
+            body.printing-case #casePrintArea { display: block !important; }
         }
     </style>
 </head>
@@ -537,6 +541,9 @@
                 </div>
 
                 <div class="flex justify-end gap-2 pt-3 border-t">
+                    <button type="button" onclick="printCaseReport()" class="px-4 py-2 border border-teal-200 text-teal-700 bg-teal-50 hover:bg-teal-100 rounded-lg text-sm font-semibold flex items-center gap-1.5">
+                        <i data-lucide="printer" class="w-4 h-4"></i> طباعة / PDF
+                    </button>
                     <button type="button" onclick="closeCaseModal()" class="px-4 py-2 border rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-50">إلغاء</button>
                     <button type="submit" class="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-semibold shadow">حفظ الحالة</button>
                 </div>
@@ -635,6 +642,32 @@
             <i data-lucide="x" class="w-5 h-5"></i>
         </button>
         <img id="xrayLightboxImg" src="" class="max-w-full max-h-full rounded-lg shadow-2xl object-contain">
+    </div>
+
+    <!-- منطقة طباعة تقرير حالة سريرية واحدة - مخفية دائماً على الشاشة، تظهر فقط أثناء
+         الطباعة الفعلية عبر printCaseReport() -->
+    <div id="casePrintArea" class="hidden" dir="rtl" style="font-family: 'Cairo', sans-serif; padding: 24px;">
+        <div style="text-align:center; margin-bottom:20px; border-bottom: 2px solid #0d9488; padding-bottom: 12px;">
+            <h1 style="font-size:20px; font-weight:bold; color:#0f766e;">تقرير حالة سريرية - DENTRA</h1>
+        </div>
+        <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <tr><td style="padding:8px; font-weight:bold; width:160px; border-bottom:1px solid #e2e8f0;">عنوان الحالة</td><td id="printCaseTitle" style="padding:8px; border-bottom:1px solid #e2e8f0;"></td></tr>
+            <tr><td style="padding:8px; font-weight:bold; border-bottom:1px solid #e2e8f0;">المريض</td><td id="printCasePatient" style="padding:8px; border-bottom:1px solid #e2e8f0;"></td></tr>
+            <tr><td style="padding:8px; font-weight:bold; border-bottom:1px solid #e2e8f0;">التخصص / المادة</td><td id="printCaseSubject" style="padding:8px; border-bottom:1px solid #e2e8f0;"></td></tr>
+            <tr><td style="padding:8px; font-weight:bold; border-bottom:1px solid #e2e8f0;">رقم السن / المنطقة</td><td id="printCaseTooth" style="padding:8px; border-bottom:1px solid #e2e8f0;"></td></tr>
+            <tr><td style="padding:8px; font-weight:bold; border-bottom:1px solid #e2e8f0;">حالة المعالجة</td><td id="printCaseStatus" style="padding:8px; border-bottom:1px solid #e2e8f0;"></td></tr>
+            <tr><td style="padding:8px; font-weight:bold; border-bottom:1px solid #e2e8f0;">الشكوى الرئيسية</td><td id="printCaseComplaint" style="padding:8px; border-bottom:1px solid #e2e8f0;"></td></tr>
+            <tr><td style="padding:8px; font-weight:bold; border-bottom:1px solid #e2e8f0;">التشخيص</td><td id="printCaseDiagnosis" style="padding:8px; border-bottom:1px solid #e2e8f0;"></td></tr>
+            <tr><td style="padding:8px; font-weight:bold; border-bottom:1px solid #e2e8f0;">خطة المعالجة</td><td id="printCasePlan" style="padding:8px; border-bottom:1px solid #e2e8f0;"></td></tr>
+            <tr><td style="padding:8px; font-weight:bold; border-bottom:1px solid #e2e8f0;">الإجراء المنجز</td><td id="printCaseProcedure" style="padding:8px; border-bottom:1px solid #e2e8f0;"></td></tr>
+            <tr><td style="padding:8px; font-weight:bold; border-bottom:1px solid #e2e8f0;">المواد المستخدمة</td><td id="printCaseMaterials" style="padding:8px; border-bottom:1px solid #e2e8f0;"></td></tr>
+            <tr><td style="padding:8px; font-weight:bold; border-bottom:1px solid #e2e8f0;">الاختلاطات</td><td id="printCaseComplications" style="padding:8px; border-bottom:1px solid #e2e8f0;"></td></tr>
+            <tr><td style="padding:8px; font-weight:bold; border-bottom:1px solid #e2e8f0;">تاريخ البدء</td><td id="printCaseStartDate" style="padding:8px; border-bottom:1px solid #e2e8f0;"></td></tr>
+            <tr><td style="padding:8px; font-weight:bold; border-bottom:1px solid #e2e8f0;">تاريخ الانتهاء</td><td id="printCaseEndDate" style="padding:8px; border-bottom:1px solid #e2e8f0;"></td></tr>
+            <tr><td style="padding:8px; font-weight:bold; border-bottom:1px solid #e2e8f0;">موعد المتابعة</td><td id="printCaseFollowUp" style="padding:8px; border-bottom:1px solid #e2e8f0;"></td></tr>
+            <tr><td style="padding:8px; font-weight:bold;">ملاحظات</td><td id="printCaseNotes" style="padding:8px;"></td></tr>
+        </table>
+        <p style="margin-top:30px; font-size:11px; color:#94a3b8; text-align:center;">تم إصدار هذا التقرير من تطبيق DENTRA</p>
     </div>
 
     <!-- UPGRADE / LOCKED FEATURE MODAL -->
@@ -1873,6 +1906,44 @@
             currentXRayEntries = [];
             pendingXRayDeletions = [];
         }
+
+        // يطبع تقرير الحالة السريرية الحالية (من بيانات نافذة التعديل مباشرة، حتى لو لم
+        // تُحفظ التعديلات بعد) بصيغة قابلة للحفظ كـPDF عبر مربع حوار الطباعة في المتصفح.
+        // ميزة مجانية متاحة لجميع الطلاب بلا استثناء (لا تتحقق من isLicenseActive())
+        function printCaseReport() {
+            const patientSelect = document.getElementById('cPatientSelect');
+            const selectedOption = patientSelect.options[patientSelect.selectedIndex];
+            const patientName = selectedOption ? selectedOption.getAttribute('data-name') : '';
+
+            const setText = (printId, value) => {
+                const el = document.getElementById(printId);
+                if (el) el.textContent = (value && String(value).trim()) ? value : '-';
+            };
+
+            setText('printCaseTitle', document.getElementById('cTitle').value);
+            setText('printCasePatient', patientName);
+            setText('printCaseSubject', document.getElementById('cSubject').value);
+            setText('printCaseTooth', document.getElementById('cTooth').value);
+            setText('printCaseStatus', document.getElementById('cStatus').value);
+            setText('printCaseComplaint', document.getElementById('cComplaint').value);
+            setText('printCaseDiagnosis', document.getElementById('cDiagnosis').value);
+            setText('printCasePlan', document.getElementById('cPlan').value);
+            setText('printCaseProcedure', document.getElementById('cProcedure').value);
+            setText('printCaseMaterials', document.getElementById('cMaterials').value);
+            setText('printCaseComplications', document.getElementById('cComplications').value);
+            setText('printCaseStartDate', document.getElementById('cStartDate').value);
+            setText('printCaseEndDate', document.getElementById('cEndDate').value);
+            setText('printCaseFollowUp', document.getElementById('cFollowUp').value);
+            setText('printCaseNotes', document.getElementById('cNotes').value);
+
+            document.body.classList.add('printing-case');
+            window.print();
+        }
+
+        // إعادة الحالة الطبيعية للصفحة بعد إغلاق مربع حوار الطباعة (نجاحاً أو إلغاءً)
+        window.addEventListener('afterprint', () => {
+            document.body.classList.remove('printing-case');
+        });
 
         function handleXRayUpload(e) {
             const files = Array.from(e.target.files || []);
