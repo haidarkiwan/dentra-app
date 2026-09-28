@@ -255,8 +255,15 @@
         <!-- REQUIREMENTS COUNTER VIEW -->
         <section id="view-requirements" class="hidden space-y-6">
             <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-2">
-                <h2 class="text-xl font-bold text-slate-800">متابعة المتطلبات السريرية الأكاديمية</h2>
-                <p class="text-xs text-slate-500">يمكنك هنا تحديد الهدف المطلوب لكل مادة وزيادة المنجز بنقرة واحدة لضمان استيفاء المتطلبات.</p>
+                <div class="flex justify-between items-start gap-3">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800">متابعة المتطلبات السريرية الأكاديمية</h2>
+                        <p class="text-xs text-slate-500 mt-1">أضف فقط المواد المطلوبة منك هذا الفصل، وحدّد الهدف المطلوب لكل مادة، وزِد المنجز بنقرة واحدة.</p>
+                    </div>
+                    <button onclick="openAddRequirementModal()" class="shrink-0 bg-teal-600 hover:bg-teal-700 text-white px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5">
+                        <i data-lucide="plus" class="w-4 h-4"></i> إضافة مادة
+                    </button>
+                </div>
             </div>
             <div id="requirementsList" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
         </section>
@@ -346,6 +353,11 @@
                             <input type="file" accept=".json" onchange="importDataBackup(event)" class="hidden">
                         </label>
                     </div>
+                </div>
+
+                <!-- Danger Zone -->
+                <div class="border-t pt-5">
+                    <button onclick="openDeleteAccountModal()" class="text-xs text-rose-500 hover:text-rose-700 hover:underline">حذف الحساب نهائياً</button>
                 </div>
 
                 <!-- Contact Developer -->
@@ -668,6 +680,38 @@
             <tr><td style="padding:8px; font-weight:bold;">ملاحظات</td><td id="printCaseNotes" style="padding:8px;"></td></tr>
         </table>
         <p style="margin-top:30px; font-size:11px; color:#94a3b8; text-align:center;">تم إصدار هذا التقرير من تطبيق DENTRA</p>
+    </div>
+
+    <!-- ADD REQUIREMENT MODAL -->
+    <div id="addRequirementModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="font-bold text-slate-800">إضافة مادة سريرية</h3>
+                <button onclick="closeAddRequirementModal()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div id="addRequirementList" class="space-y-2 max-h-[50vh] overflow-y-auto"></div>
+        </div>
+    </div>
+
+    <!-- DELETE ACCOUNT MODAL -->
+    <div id="deleteAccountModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4 z-[65]">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            <div class="text-center space-y-2">
+                <div class="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+                    <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+                </div>
+                <h3 class="font-bold text-slate-800">حذف الحساب نهائياً</h3>
+                <p class="text-xs text-rose-600 leading-6">سيُحذف حسابك وكل بياناته (المرضى، الحالات، الصور الشعاعية، المتطلبات، المواعيد) نهائياً بلا أي إمكانية للاستعادة. أدخل كلمة مرورك لتأكيد هويتك والمتابعة.</p>
+            </div>
+            <form id="deleteAccountForm" onsubmit="handleDeleteAccountSubmit(event)" class="space-y-3">
+                <input type="password" id="deleteAccountPassword" required placeholder="كلمة المرور الحالية" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-500">
+                <p id="deleteAccountError" class="text-xs text-rose-600 min-h-[16px]"></p>
+                <div class="flex gap-2">
+                    <button type="button" onclick="closeDeleteAccountModal()" class="flex-1 px-4 py-2 border rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-50">إلغاء</button>
+                    <button type="submit" id="deleteAccountSubmitBtn" class="flex-1 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm font-semibold shadow">حذف نهائياً</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <!-- UPGRADE / LOCKED FEATURE MODAL -->
@@ -1087,6 +1131,89 @@
             });
         }
 
+        function openDeleteAccountModal() {
+            document.getElementById('deleteAccountForm').reset();
+            document.getElementById('deleteAccountError').textContent = '';
+            document.getElementById('deleteAccountModal').classList.remove('hidden');
+            document.getElementById('deleteAccountModal').classList.add('flex');
+            lucide.createIcons();
+        }
+
+        function closeDeleteAccountModal() {
+            document.getElementById('deleteAccountModal').classList.add('hidden');
+            document.getElementById('deleteAccountModal').classList.remove('flex');
+        }
+
+        async function handleDeleteAccountSubmit(e) {
+            e.preventDefault();
+            const password = document.getElementById('deleteAccountPassword').value;
+            const errEl = document.getElementById('deleteAccountError');
+            const btn = document.getElementById('deleteAccountSubmitBtn');
+            errEl.textContent = '';
+            btn.disabled = true; btn.textContent = 'جارٍ الحذف...';
+            try {
+                await deleteAccountPermanently(password);
+                // لا حاجة لإغلاق النافذة يدوياً أو إعادة تفعيل الزر - onAuthStateChanged
+                // سيعرض شاشة الدخول تلقائياً فور نجاح حذف حساب المصادقة في الخطوة الأخيرة
+            } catch (err) {
+                errEl.textContent = err.message || 'تعذر حذف الحساب، حاول مرة أخرى.';
+                btn.disabled = false; btn.textContent = 'حذف نهائياً';
+            }
+        }
+
+        // يحذف الحساب نهائياً بالترتيب الصحيح: إعادة تأكيد الهوية أولاً (متطلَّب من
+        // Firebase لعمليات حساسة كهذه) ← حذف كل بيانات Firestore بما فيها وثيقة الحساب
+        // (حرج) ← تحرير كود الترخيص (ثانوي) ← حذف حساب المصادقة نفسه (الخطوة الأخيرة
+        // دائماً، لأنها تُنهي الجلسة فوراً).
+        // ملاحظة: يجب أن يأتي تحرير الكود بعد حذف وثيقة الحساب تحديداً، لأن قاعدة الأمان
+        // لا تسمح للطالب بتحرير كوده إلا إذا لم تعد وثيقة حسابه موجودة - وإلا لاستطاع
+        // تحريره وتفعيله على حساب آخر مع بقاء حسابه الأول مفعَّلاً (مشاركة كود واحد)
+        async function deleteAccountPermanently(password) {
+            const user = currentUser;
+            const uid = user.uid;
+
+            try {
+                const credential = firebase.auth.EmailAuthProvider.credential(user.email, password);
+                await user.reauthenticateWithCredential(credential);
+            } catch (err) {
+                if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+                    throw new Error('كلمة المرور غير صحيحة.');
+                }
+                throw new Error(`تعذر تأكيد الهوية [${err.code || 'unknown'}]، تحقق من اتصالك بالإنترنت وحاول مرة أخرى.`);
+            }
+
+            // نلتقط بيانات الترخيص قبل حذف وثيقة الحساب (نحتاج رمز الكود لتحريره لاحقاً)
+            const lic = (studentProfile && studentProfile.license) || {};
+            const codeToRelease = (lic.status === 'active' && lic.code) ? lic.code : null;
+
+            // حذف كل بيانات الحساب (حرج) - بنفس أسلوب الحذف المتسلسل المعتمد مسبقاً
+            try {
+                const studentRef = db.collection('students').doc(uid);
+                await deleteAllInCollection(studentRef.collection('requirements'));
+                await deleteAllInCollection(studentRef.collection('appointments'));
+                await deleteAllInCollection(studentRef.collection('patients'));
+                await deleteAllCasesWithXrays(uid);
+                await studentRef.delete();
+            } catch (err) {
+                throw new Error(`تعذر حذف بيانات الحساب [${err.code || 'unknown'}]: ${err.message}`);
+            }
+
+            // تحرير كود الترخيص (ثانوي) - لا نوقف حذف الحساب إن فشلت هذه الخطوة وحدها؛
+            // في هذه الحالة يبقى الكود "مفعَّلاً" لحساب محذوف ويحتاج معالجة يدوية من الإدارة
+            if (codeToRelease) {
+                try {
+                    await db.collection('licenseCodes').doc(codeToRelease).update({
+                        status: 'unused', assignedToUid: null, deviceId: null, activatedAt: null
+                    });
+                } catch (err) {
+                    console.warn('تعذر تحرير كود الترخيص عند حذف الحساب:', err.code, err.message);
+                }
+            }
+
+            // حذف حساب المصادقة نفسه - آخر خطوة دائماً
+            await user.delete();
+        }
+
         function showAuthScreen() {
             _authResolved = true;
             document.getElementById('authLoading').classList.add('hidden');
@@ -1140,8 +1267,6 @@
         let requirementsCache = [];
         let appointmentsCache = [];
         let _firestoreUnsubscribers = [];
-        let _reqsSeeded = false;
-        let _restoreInProgress = false; // true أثناء تنفيذ استرجاع نسخة احتياطية فقط
 
         function initApp() {
             lucide.createIcons();
@@ -1195,27 +1320,14 @@
 
             _firestoreUnsubscribers.push(
                 studentRef.collection('requirements').onSnapshot(snap => {
-                    // أثناء تنفيذ استرجاع نسخة احتياطية، لا نتدخل بأي زرع/ترحيل تلقائي: اللقطة
-                    // الفارغة اللحظية هنا متوقعة (لأن الاسترجاع يحذف كل شيء قبل إعادة الإضافة)
-                    // وليست دليلاً على أن هذا حساب جديد يحتاج متطلبات افتراضية
-                    if (_restoreInProgress) return;
-
-                    if (snap.empty) {
-                        seedDefaultRequirements();
-                        return; // سيصل مستمع جديد بالبيانات فور اكتمال الزرع أدناه
-                    }
+                    // لا زرع تلقائي بعد الآن: يبدأ كل حساب فارغاً من المتطلبات، ويضيف
+                    // الطالب بنفسه فقط ما يحتاجه هذا الفصل عبر زر "إضافة مادة"
                     requirementsCache = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
                     requirementsCache.sort((a, b) => {
                         const ia = REQUIREMENT_SUBJECTS_ORDER.indexOf(a.subject);
                         const ib = REQUIREMENT_SUBJECTS_ORDER.indexOf(b.subject);
                         return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
                     });
-
-                    // ترحيل: إضافة مادة "أمراض الفم" تلقائياً لحساب لديه متطلبات محفوظة مسبقاً بدونها
-                    if (!requirementsCache.some(r => r.subject === 'أمراض الفم')) {
-                        studentRef.collection('requirements').add({ subject: 'أمراض الفم', goal: 5, completed: 0 })
-                            .catch(err => console.error('تعذر إضافة مادة أمراض الفم:', err));
-                    }
 
                     renderRequirements();
                     renderDashboard();
@@ -1229,24 +1341,6 @@
                     renderHomeTodayAppointments();
                 }, err => console.error('تعذر تحميل المواعيد:', err))
             );
-        }
-
-        // يزرع قائمة المتطلبات الافتراضية لحساب الطالب عند أول استخدام فقط (حين تكون
-        // المجموعة فارغة تماماً على Firestore)
-        async function seedDefaultRequirements() {
-            if (_reqsSeeded) return;
-            _reqsSeeded = true;
-            try {
-                const batch = db.batch();
-                const reqsRef = db.collection('students').doc(currentUser.uid).collection('requirements');
-                DEFAULT_REQUIREMENTS.forEach(r => {
-                    batch.set(reqsRef.doc(), { subject: r.subject, goal: r.goal, completed: 0 });
-                });
-                await batch.commit();
-            } catch (err) {
-                console.error('تعذر تهيئة قائمة المتطلبات الافتراضية:', err);
-                _reqsSeeded = false; // السماح بإعادة المحاولة عند وصول لقطة فارغة أخرى
-            }
         }
 
         // MODERN CONFIRM DIALOG (replaces the browser's native confirm())
@@ -1416,7 +1510,6 @@
         // للمرضى/الحالات كي تبقى الروابط بينها (patientId داخل كل حالة) سليمة بعد الاسترجاع
         async function restoreBackupData(data) {
             const uid = currentUser.uid;
-            _restoreInProgress = true;
             try {
                 if (data.profile) {
                     await db.collection('students').doc(uid).set({
@@ -1489,26 +1582,10 @@
 
                 await batch.commit();
                 alert('تم استرجاع البيانات بنجاح!');
-                // لا حاجة لإعادة تحميل الصفحة - المستمعون الحيّون (onSnapshot) سيحدّثون الواجهة تلقائياً
+                // لا حاجة لإعادة تحميل الصفحة أو المتطلبات يدوياً - المستمعون الحيّون
+                // (onSnapshot) سيحدّثون الواجهة تلقائياً بالنتيجة النهائية الصحيحة
             } catch (err) {
                 alert('تعذر استرجاع البيانات: ' + err.message);
-            } finally {
-                _restoreInProgress = false;
-                // المستمع الحي تجاهل كل تحديثات المتطلبات أثناء الاسترجاع (لمنع تكرارها)،
-                // لذا نُعيد تحميلها يدوياً الآن من الخادم لتعكس الواجهة النتيجة الصحيحة فوراً
-                try {
-                    const freshSnap = await db.collection('students').doc(uid).collection('requirements').get({ source: 'server' });
-                    requirementsCache = freshSnap.docs.map(d => Object.assign({ id: d.id }, d.data()));
-                    requirementsCache.sort((a, b) => {
-                        const ia = REQUIREMENT_SUBJECTS_ORDER.indexOf(a.subject);
-                        const ib = REQUIREMENT_SUBJECTS_ORDER.indexOf(b.subject);
-                        return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
-                    });
-                    renderRequirements();
-                    renderDashboard();
-                } catch (err) {
-                    console.error('تعذر إعادة تحميل المتطلبات بعد الاسترجاع:', err);
-                }
             }
         }
 
@@ -2200,6 +2277,16 @@
             const list = document.getElementById('requirementsList');
             list.innerHTML = '';
 
+            if (reqs.length === 0) {
+                list.innerHTML = `
+                    <div class="col-span-full text-center text-slate-400 py-10 text-sm">
+                        لم تُضف أي مادة سريرية بعد.<br>
+                        اضغط "إضافة مادة" أعلاه لإضافة ما يُطلَب منك هذا الفصل.
+                    </div>
+                `;
+                return;
+            }
+
             reqs.forEach((r, idx) => {
                 const percent = r.goal > 0 ? Math.min(100, Math.round((r.completed / r.goal) * 100)) : 0;
                 const card = document.createElement('div');
@@ -2207,7 +2294,12 @@
                 card.innerHTML = `
                     <div class="flex justify-between items-center">
                         <h3 class="font-bold text-slate-800 text-sm">${escapeHtml(r.subject)}</h3>
-                        <span class="text-xs font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded">${percent}%</span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-xs font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded">${percent}%</span>
+                            <button onclick="deleteRequirement('${r.id}', '${escapeHtml(r.subject)}', ${r.completed || 0})" title="حذف المادة" class="text-rose-400 hover:text-rose-600">
+                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="w-full bg-slate-100 rounded-full h-2">
                         <div class="bg-teal-600 h-2 rounded-full transition-all" style="width: ${percent}%"></div>
@@ -2224,6 +2316,61 @@
                     </div>
                 `;
                 list.appendChild(card);
+            });
+            lucide.createIcons();
+        }
+
+        // يعرض قائمة المواد الثمانية غير المضافة بعد فقط (لمنع التكرار)، ليختار الطالب
+        // ما يحتاجه فعلياً هذا الفصل
+        function openAddRequirementModal() {
+            const existingSubjects = requirementsCache.map(r => r.subject);
+            const available = REQUIREMENT_SUBJECTS_ORDER.filter(s => !existingSubjects.includes(s));
+            const listEl = document.getElementById('addRequirementList');
+
+            if (available.length === 0) {
+                listEl.innerHTML = '<p class="text-center text-slate-400 text-sm py-6">تمت إضافة كل المواد المتاحة بالفعل.</p>';
+            } else {
+                listEl.innerHTML = available.map(subject => `
+                    <button onclick="addRequirement('${escapeHtml(subject)}')" class="w-full text-right px-4 py-3 border border-slate-200 rounded-lg hover:bg-teal-50 hover:border-teal-300 text-sm font-semibold text-slate-700 flex items-center justify-between">
+                        ${escapeHtml(subject)}
+                        <i data-lucide="plus-circle" class="w-4 h-4 text-teal-600"></i>
+                    </button>
+                `).join('');
+            }
+
+            document.getElementById('addRequirementModal').classList.remove('hidden');
+            document.getElementById('addRequirementModal').classList.add('flex');
+            lucide.createIcons();
+        }
+
+        function closeAddRequirementModal() {
+            document.getElementById('addRequirementModal').classList.add('hidden');
+            document.getElementById('addRequirementModal').classList.remove('flex');
+        }
+
+        async function addRequirement(subject) {
+            const defaultEntry = DEFAULT_REQUIREMENTS.find(r => r.subject === subject);
+            const goal = defaultEntry ? defaultEntry.goal : 5;
+            try {
+                await db.collection('students').doc(currentUser.uid).collection('requirements').add({
+                    subject, goal, completed: 0
+                });
+                closeAddRequirementModal();
+            } catch (err) {
+                alert(`تعذر إضافة المادة [${err.code || 'unknown'}]: ${err.message}`);
+            }
+        }
+
+        function deleteRequirement(reqId, subject, completed) {
+            const msg = completed > 0
+                ? `هل أنت متأكد من حذف مادة "${subject}"؟ ستخسر التقدم المسجَّل حالياً (${completed}) لهذه المادة.`
+                : `هل أنت متأكد من حذف مادة "${subject}"؟`;
+            showConfirmDialog(msg, async () => {
+                try {
+                    await db.collection('students').doc(currentUser.uid).collection('requirements').doc(reqId).delete();
+                } catch (err) {
+                    alert(`تعذر حذف المادة [${err.code || 'unknown'}]: ${err.message}`);
+                }
             });
         }
 
