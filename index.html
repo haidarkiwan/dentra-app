@@ -1156,9 +1156,10 @@
             }
             errEl.textContent = 'جارٍ إرسال رابط إعادة التعيين...';
             try {
+                auth.languageCode = 'ar'; // لغة قالب رسالة البريد فقط
                 await auth.sendPasswordResetEmail(email);
                 errEl.classList.remove('text-rose-600'); errEl.classList.add('text-emerald-600');
-                errEl.textContent = 'إن كان هذا البريد مسجَّلاً لدينا فسيصلك رابط إعادة تعيين كلمة المرور خلال دقائق (تحقق من البريد المزعج أيضاً).';
+                errEl.textContent = 'تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني إن كان مسجَّلاً لدينا. إن لم تصلك الرسالة خلال دقائق، يُرجى مراجعة مجلد الرسائل غير المرغوب فيها (Spam).';
             } catch (err) {
                 errEl.textContent = translateAuthError(err);
             }
@@ -1335,7 +1336,7 @@
             errEl.textContent = '';
             btn.disabled = true; btn.textContent = 'جارٍ الحذف...';
             try {
-                const outcome = await deleteAccountPermanently(password);
+                const outcome = await deleteAccountPermanently(password, (t) => { btn.textContent = t; });
                 // لا حاجة لإغلاق النافذة يدوياً أو إعادة تفعيل الزر - onAuthStateChanged
                 // سيعرض شاشة الدخول تلقائياً فور نجاح حذف حساب المصادقة في الخطوة الأخيرة
                 if (outcome && outcome.unreleasedCodes && outcome.unreleasedCodes.length) {
@@ -1377,13 +1378,15 @@
         // ملاحظة صريحة: هذه العملية من جهة العميل وليست atomic. أي فشل في المنتصف يُعرض كخطأ
         // (لا نجاح كاذب) ويمكن إعادة المحاولة بأمان. الحذف الذري الحقيقي يتطلب Cloud Function /
         // Admin SDK (recursiveDelete + حذف المستخدم + تحرير الكود في خطوة خادمية واحدة).
-        async function deleteAccountPermanently(password) {
+        async function deleteAccountPermanently(password, onStatus) {
+            const say = (t) => { if (onStatus) { try { onStatus(t); } catch (_) { /* للعرض فقط */ } } };
             const user = currentUser;
             const uid = user.uid;
             const studentRef = db.collection('students').doc(uid);
             const hintKey = 'dentra_pending_account_deletion';
 
             // A) إعادة التحقق من هوية المستخدم
+            say('جارٍ التحقق من هويتك...');
             try {
                 const credential = firebase.auth.EmailAuthProvider.credential(user.email, password);
                 await user.reauthenticateWithCredential(credential);
@@ -1437,22 +1440,21 @@
 
             // C) حذف بيانات Firestore (حرج). أي فشل: نتوقف ولا نلمس حساب المصادقة
             try {
-                await deleteAllInCollection(studentRef.collection('requirements'));
-                await deleteAllInCollection(studentRef.collection('appointments'));
-                await deleteAllDocsWithCounters(
-                    studentRef,
-                    studentRef.collection('patients'),
-                    'patients'
-                );
-                await deleteAllDocsWithCounters(
-                    studentRef,
-                    studentRef.collection('cases'),
-                    'cases',
-                    (caseDoc) => deleteQueryInPages(
-                        caseDoc.ref.collection('xrays'),
-                        50
-                    )
-                );
+                say('جارٍ حذف بياناتك...');
+                const counters = (studentProfile && studentProfile.counters) || {};
+                const patientsTotal = counters.patients || 0;
+                // المتطلبات والمواعيد مستقلة عن العدّادات فتُحذف بالتوازي مع المرضى ثم الحالات
+                // (المرضى والحالات تبقى تسلسلية: كل حذف يُنقص العدّاد في وثيقة الطالب نفسها)
+                await Promise.all([
+                    deleteAllInCollection(studentRef.collection('requirements')),
+                    deleteAllInCollection(studentRef.collection('appointments')),
+                    (async () => {
+                        await deleteAllDocsWithCounters(studentRef, studentRef.collection('patients'), 'patients', null,
+                            (n) => say(`جارٍ حذف المرضى (${n}/${Math.max(patientsTotal, n)})...`));
+                        await deleteAllCasesForAccount(studentRef, say, counters.cases || 0);
+                    })()
+                ]);
+                say('جارٍ إنهاء حذف الحساب...');
                 await studentRef.delete();
             } catch (err) {
                 throw new Error(`لم يكتمل حذف بيانات حسابك [${err.code || 'unknown'}]: ${err.message}. ` +
@@ -1490,6 +1492,41 @@
 
             try { localStorage.removeItem(hintKey); } catch (_) { /* لا شيء */ }
             return { unreleasedCodes: unreleasedCodes };
+        }
+
+        // يشغّل worker على عناصر القائمة بتوازٍ محدود (limit)، ويتوقف عند أول فشل ويرميه
+        async function runWithConcurrency(items, limit, worker) {
+            let next = 0;
+            let failure = null;
+            const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+                while (failure === null) {
+                    const i = next++;
+                    if (i >= items.length) return;
+                    try { await worker(items[i], i); } catch (e) { failure = e; return; }
+                }
+            });
+            await Promise.all(runners);
+            if (failure !== null) throw failure;
+        }
+
+        // حذف كل الحالات مع صورها عند حذف الحساب: صور الحالات تُحذف أولاً بتوازٍ محدود (لا علاقة لها
+        // بالعدّادات)، ثم الحالات نفسها واحدة واحدة (كل حالة transaction تُنقص العدّاد، وهذا تسلسلي
+        // بحكم قواعد الأمان). تبقى صور أي حالة جديدة ظهرت أثناء الحذف تُحذف قبل وثيقتها كما كان
+        async function deleteAllCasesForAccount(studentRef, onStatus, casesTotal) {
+            const say = (t) => { if (onStatus) { try { onStatus(t); } catch (_) { /* للعرض فقط */ } } };
+            const casesCol = studentRef.collection('cases');
+            const snap = await casesCol.get({ source: 'server' });
+            const preDeleted = new Set();
+            let xdone = 0;
+            await runWithConcurrency(snap.docs, 4, async (caseDoc) => {
+                await deleteQueryInPages(caseDoc.ref.collection('xrays'), 50);
+                preDeleted.add(caseDoc.id);
+                xdone++;
+                say(`جارٍ حذف الصور الشعاعية (${xdone}/${snap.size})...`);
+            });
+            await deleteAllDocsWithCounters(studentRef, casesCol, 'cases',
+                (caseDoc) => preDeleted.has(caseDoc.id) ? null : deleteQueryInPages(caseDoc.ref.collection('xrays'), 50),
+                (n) => say(`جارٍ حذف الحالات (${n}/${Math.max(casesTotal || 0, snap.size, n)})...`));
         }
 
         function showAuthScreen() {
@@ -1829,8 +1866,9 @@
         // من نسخة محلية مؤقتة). آمن للتكرار: يعيد الاستعلام بعد كل صفحة فيرى ما تبقّى فقط،
         // ولا يفشل إن كان لا شيء ليُحذف. beforeDeletePage(docs) يُستدعى قبل حذف كل صفحة (يُستخدم
         // لحذف المجموعات الفرعية أولاً). يتوقف بخطأ صريح إن ظهرت نفس الوثائق بعد "حذفها"
-        async function deleteQueryInPages(baseQuery, pageSize, beforeDeletePage) {
+        async function deleteQueryInPages(baseQuery, pageSize, beforeDeletePage, options) {
             const size = Math.min(pageSize || 300, FIRESTORE_BATCH_MAX_OPS);
+            const verifyEmpty = !(options && options.verifyEmpty === false);
             let total = 0;
             let previousIds = null;
             while (true) {
@@ -1844,6 +1882,7 @@
                 if (beforeDeletePage) await beforeDeletePage(snap.docs);
                 await commitOpsInChunks(snap.docs.map(d => batchDeleteOp(d.ref)));
                 total += snap.size;
+                if (!verifyEmpty && snap.size < size) return total; // صفحة غير ممتلئة نُفِّذ حذفها: لا حاجة لاستعلام تأكيد إضافي
             }
         }
 
@@ -1870,7 +1909,7 @@
         // يُستدعى قبل حذف كل وثيقة (لحذف صورها الشعاعية أولاً). آمن للتكرار: الوثيقة المحذوفة
         // سلفاً لا تُنقص العدّاد، ويُقرأ ما تبقّى من الخادم في كل جولة. يتوقف بخطأ صريح إن ظهرت
         // نفس الوثائق بعد "حذفها"
-        async function deleteAllDocsWithCounters(studentRef, collectionRef, field, beforeEachDoc) {
+        async function deleteAllDocsWithCounters(studentRef, collectionRef, field, beforeEachDoc, onEach) {
             let total = 0;
             let previousIds = null;
             while (true) {
@@ -1885,6 +1924,7 @@
                     if (beforeEachDoc) await beforeEachDoc(doc);
                     await deleteDocWithCounterTx(studentRef, doc.ref, field);
                     total++;
+                    if (onEach) { try { onEach(total); } catch (_) { /* التقدم للعرض فقط */ } }
                 }
             }
         }
@@ -2474,8 +2514,7 @@
                 throw new Error('حقل عدّاد غير مسموح: ' + String(field));
             }
             return db.runTransaction(async (tx) => {
-                const studentSnap = await tx.get(studentRef);
-                const docSnap = await tx.get(docRef);
+                const [studentSnap, docSnap] = await Promise.all([tx.get(studentRef), tx.get(docRef)]);
                 const related = [];
                 if (relatedRefsFn) {
                     const seen = new Set();
@@ -3015,6 +3054,7 @@
 
             reqs.forEach((r, idx) => {
                 const percent = r.goal > 0 ? Math.min(100, Math.round((r.completed / r.goal) * 100)) : 0;
+                const atGoal = (r.completed || 0) >= (r.goal || 0); // لا يُسمح بتجاوز الهدف
                 const card = document.createElement('div');
                 card.className = 'bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3';
                 card.innerHTML = `
@@ -3036,8 +3076,8 @@
                             <input type="number" min="0" value="${r.goal}" onchange="updateReqGoal(${idx}, this.value)" class="w-14 border border-slate-200 rounded px-1.5 py-0.5 text-xs text-center focus:outline-none focus:ring-2 focus:ring-teal-500" title="الهدف المطلوب">
                         </span>
                         <div class="flex gap-1">
-                            <button onclick="updateReqCount(${idx}, 1)" class="bg-teal-600 text-white w-6 h-6 rounded flex items-center justify-center font-bold text-sm">+</button>
-                            <button onclick="updateReqCount(${idx}, -1)" class="bg-slate-200 text-slate-700 w-6 h-6 rounded flex items-center justify-center font-bold text-sm">-</button>
+                            <button onclick="updateReqCount(${idx}, 1)" ${atGoal ? 'disabled title="وصلت إلى الهدف المحدد"' : ''} class="bg-teal-600 text-white w-6 h-6 rounded flex items-center justify-center font-bold text-sm ${atGoal ? 'opacity-40 cursor-not-allowed' : ''}">+</button>
+                            <button onclick="updateReqCount(${idx}, -1)" ${(r.completed || 0) <= 0 ? 'disabled' : ''} class="bg-slate-200 text-slate-700 w-6 h-6 rounded flex items-center justify-center font-bold text-sm ${(r.completed || 0) <= 0 ? 'opacity-40 cursor-not-allowed' : ''}">-</button>
                         </div>
                     </div>
                 `;
@@ -3103,7 +3143,11 @@
         async function updateReqCount(index, change) {
             const req = requirementsCache[index];
             if (!req) return;
-            const newVal = Math.max(0, (req.completed || 0) + change);
+            const goal = Math.max(0, Number(req.goal) || 0);
+            const current = Math.max(0, Number(req.completed) || 0);
+            // المنجز لا يتجاوز الهدف أبداً (الزيادة تتوقف عند الهدف)، والإنقاص لا ينزل عن صفر
+            const newVal = change > 0 ? Math.min(goal, current + change) : Math.max(0, current + change);
+            if (newVal === current) { renderRequirements(); return; }
             try {
                 await db.collection('students').doc(currentUser.uid).collection('requirements').doc(req.id).update({ completed: newVal });
             } catch (err) {
@@ -3118,6 +3162,12 @@
             const req = requirementsCache[index];
             if (!req) return;
             const goal = Math.max(0, parseInt(value, 10) || 0);
+            const completedNow = Math.max(0, Number(req.completed) || 0);
+            if (goal < completedNow) {
+                alert(`لا يمكن أن يكون الهدف (${goal}) أقل من العدد المنجز (${completedNow}). قلّل العدد المنجز أولاً ثم عدّل الهدف.`);
+                renderRequirements(); // إعادة عرض الهدف المخزَّن
+                return;
+            }
             try {
                 await db.collection('students').doc(currentUser.uid).collection('requirements').doc(req.id).update({ goal });
             } catch (err) {
