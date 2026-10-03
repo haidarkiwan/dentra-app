@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DENTRA - لوحة التحكم الإدارية</title>
+    <meta name="robots" content="noindex, nofollow">
+    <script src="https://unpkg.com/lucide@1.50.0/dist/umd/lucide.min.js" integrity="sha384-/sIySnlbVLfPSNdgy7yqanP6+Dv4en7FlBure4Rag0mp480bA2f+nTviC6933zkQ" crossorigin="anonymous"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <style id="tailwind-compiled">*,:after,:before{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgba(59,130,246,.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }::backdrop{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgba(59,130,246,.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }/*! tailwindcss v3.4.17 | MIT License | https://tailwindcss.com*/*,:after,:before{box-sizing:border-box;border:0 solid #e5e7eb}:after,:before{--tw-content:""}:host,html{line-height:1.5;-webkit-text-size-adjust:100%;-moz-tab-size:4;-o-tab-size:4;tab-size:4;font-family:ui-sans-serif,system-ui,sans-serif,Apple Color Emoji,Segoe UI Emoji,Segoe UI Symbol,Noto Color Emoji;font-feature-settings:normal;font-variation-settings:normal;-webkit-tap-highlight-color:transparent}body{margin:0;line-height:inherit}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,pre,samp{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,Courier New,monospace;font-feature-settings:normal;font-variation-settings:normal;font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}button,input,optgroup,select,textarea{font-family:inherit;font-feature-settings:inherit;font-variation-settings:inherit;font-size:100%;font-weight:inherit;line-height:inherit;letter-spacing:inherit;color:inherit;margin:0;padding:0}button,select{text-transform:none}button,input:where([type=button]),input:where([type=reset]),input:where([type=submit]){-webkit-appearance:button;background-color:transparent;background-image:none}:-moz-focusring{outline:auto}:-moz-ui-invalid{box-shadow:none}progress{vertical-align:baseline}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}summary{display:list-item}blockquote,dd,dl,figure,h1,h2,h3,h4,h5,h6,hr,p,pre{margin:0}fieldset{margin:0}fieldset,legend{padding:0}menu,ol,ul{list-style:none;margin:0;padding:0}dialog{padding:0}textarea{resize:vertical}input::-moz-placeholder,textarea::-moz-placeholder{opacity:1;color:#9ca3af}input::placeholder,textarea::placeholder{opacity:1;color:#9ca3af}[role=button],button{cursor:pointer}:disabled{cursor:default}audio,canvas,embed,iframe,img,object,svg,video{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}[hidden]:where(:not([hidden=until-found])){display:none}.container{width:100%}@media (min-width:640px){.container{max-width:640px}}@media (min-width:768px){.container{max-width:768px}}@media (min-width:1024px){.container{max-width:1024px}}@media (min-width:1280px){.container{max-width:1280px}}@media (min-width:1536px){.container{max-width:1536px}}.fixed{position:fixed}.sticky{position:sticky}.inset-0{inset:0}.top-0{top:0}.z-40{z-index:40}.z-\[60\]{z-index:60}.mx-auto{margin-left:auto;margin-right:auto}.mb-1{margin-bottom:.25rem}.mt-1{margin-top:.25rem}.block{display:block}.flex{display:flex}.grid{display:grid}.hidden{display:none}.h-12{height:3rem}.h-3\.5{height:.875rem}.h-4{height:1rem}.h-5{height:1.25rem}.h-6{height:1.5rem}.h-8{height:2rem}.max-h-\[60vh\]{max-height:60vh}.min-h-\[16px\]{min-height:16px}.min-h-screen{min-height:100vh}.w-12{width:3rem}.w-3\.5{width:.875rem}.w-4{width:1rem}.w-5{width:1.25rem}.w-6{width:1.5rem}.w-8{width:2rem}.w-full{width:100%}.max-w-5xl{max-width:64rem}.max-w-sm{max-width:24rem}.flex-1{flex:1 1 0%}.shrink-0{flex-shrink:0}.grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}.flex-col{flex-direction:column}.flex-wrap{flex-wrap:wrap}.items-center{align-items:center}.justify-center{justify-content:center}.justify-between{justify-content:space-between}.gap-1\.5{gap:.375rem}.gap-2{gap:.5rem}.gap-3{gap:.75rem}.space-y-1>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(.25rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(.25rem*var(--tw-space-y-reverse))}.space-y-2>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(.5rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(.5rem*var(--tw-space-y-reverse))}.space-y-3>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(.75rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(.75rem*var(--tw-space-y-reverse))}.space-y-4>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1rem*var(--tw-space-y-reverse))}.space-y-5>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1.25rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1.25rem*var(--tw-space-y-reverse))}.space-y-6>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1.5rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1.5rem*var(--tw-space-y-reverse))}.overflow-y-auto{overflow-y:auto}.rounded{border-radius:.25rem}.rounded-full{border-radius:9999px}.rounded-lg{border-radius:.5rem}.rounded-xl{border-radius:.75rem}.border{border-width:1px}.border-t{border-top-width:1px}.border-amber-200{--tw-border-opacity:1;border-color:rgb(253 230 138/var(--tw-border-opacity,1))}.border-rose-200{--tw-border-opacity:1;border-color:rgb(254 205 211/var(--tw-border-opacity,1))}.border-slate-200{--tw-border-opacity:1;border-color:rgb(226 232 240/var(--tw-border-opacity,1))}.border-white\/20{border-color:hsla(0,0%,100%,.2)}.bg-amber-50{--tw-bg-opacity:1;background-color:rgb(255 251 235/var(--tw-bg-opacity,1))}.bg-emerald-100{--tw-bg-opacity:1;background-color:rgb(209 250 229/var(--tw-bg-opacity,1))}.bg-rose-100{--tw-bg-opacity:1;background-color:rgb(255 228 230/var(--tw-bg-opacity,1))}.bg-rose-50{--tw-bg-opacity:1;background-color:rgb(255 241 242/var(--tw-bg-opacity,1))}.bg-slate-100{--tw-bg-opacity:1;background-color:rgb(241 245 249/var(--tw-bg-opacity,1))}.bg-slate-50{--tw-bg-opacity:1;background-color:rgb(248 250 252/var(--tw-bg-opacity,1))}.bg-slate-800{--tw-bg-opacity:1;background-color:rgb(30 41 59/var(--tw-bg-opacity,1))}.bg-slate-900\/50{background-color:rgba(15,23,42,.5)}.bg-white{--tw-bg-opacity:1;background-color:rgb(255 255 255/var(--tw-bg-opacity,1))}.bg-white\/10{background-color:hsla(0,0%,100%,.1)}.p-3{padding:.75rem}.p-4{padding:1rem}.p-5{padding:1.25rem}.p-6{padding:1.5rem}.px-2{padding-left:.5rem;padding-right:.5rem}.px-3{padding-left:.75rem;padding-right:.75rem}.px-4{padding-left:1rem;padding-right:1rem}.px-6{padding-left:1.5rem;padding-right:1.5rem}.py-0\.5{padding-top:.125rem;padding-bottom:.125rem}.py-1\.5{padding-top:.375rem;padding-bottom:.375rem}.py-2{padding-top:.5rem;padding-bottom:.5rem}.py-2\.5{padding-top:.625rem;padding-bottom:.625rem}.py-3{padding-top:.75rem;padding-bottom:.75rem}.py-6{padding-top:1.5rem;padding-bottom:1.5rem}.pt-1{padding-top:.25rem}.pt-4{padding-top:1rem}.text-center{text-align:center}.font-mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,Courier New,monospace}.text-2xl{font-size:1.5rem;line-height:2rem}.text-\[10px\]{font-size:10px}.text-\[11px\]{font-size:11px}.text-lg{font-size:1.125rem;line-height:1.75rem}.text-sm{font-size:.875rem;line-height:1.25rem}.text-xl{font-size:1.25rem;line-height:1.75rem}.text-xs{font-size:.75rem;line-height:1rem}.font-bold{font-weight:700}.font-semibold{font-weight:600}.leading-6{line-height:1.5rem}.text-amber-600{--tw-text-opacity:1;color:rgb(217 119 6/var(--tw-text-opacity,1))}.text-amber-700{--tw-text-opacity:1;color:rgb(180 83 9/var(--tw-text-opacity,1))}.text-emerald-600{--tw-text-opacity:1;color:rgb(5 150 105/var(--tw-text-opacity,1))}.text-emerald-700{--tw-text-opacity:1;color:rgb(4 120 87/var(--tw-text-opacity,1))}.text-rose-500{--tw-text-opacity:1;color:rgb(244 63 94/var(--tw-text-opacity,1))}.text-rose-600{--tw-text-opacity:1;color:rgb(225 29 72/var(--tw-text-opacity,1))}.text-slate-400{--tw-text-opacity:1;color:rgb(148 163 184/var(--tw-text-opacity,1))}.text-slate-500{--tw-text-opacity:1;color:rgb(100 116 139/var(--tw-text-opacity,1))}.text-slate-600{--tw-text-opacity:1;color:rgb(71 85 105/var(--tw-text-opacity,1))}.text-slate-700{--tw-text-opacity:1;color:rgb(51 65 85/var(--tw-text-opacity,1))}.text-slate-800{--tw-text-opacity:1;color:rgb(30 41 59/var(--tw-text-opacity,1))}.text-white{--tw-text-opacity:1;color:rgb(255 255 255/var(--tw-text-opacity,1))}.shadow{--tw-shadow:0 1px 3px 0 rgba(0,0,0,.1),0 1px 2px -1px rgba(0,0,0,.1);--tw-shadow-colored:0 1px 3px 0 var(--tw-shadow-color),0 1px 2px -1px var(--tw-shadow-color)}.shadow,.shadow-lg{box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.shadow-lg{--tw-shadow:0 10px 15px -3px rgba(0,0,0,.1),0 4px 6px -4px rgba(0,0,0,.1);--tw-shadow-colored:0 10px 15px -3px var(--tw-shadow-color),0 4px 6px -4px var(--tw-shadow-color)}.shadow-sm{--tw-shadow:0 1px 2px 0 rgba(0,0,0,.05);--tw-shadow-colored:0 1px 2px 0 var(--tw-shadow-color)}.shadow-sm,.shadow-xl{box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.shadow-xl{--tw-shadow:0 20px 25px -5px rgba(0,0,0,.1),0 8px 10px -6px rgba(0,0,0,.1);--tw-shadow-colored:0 20px 25px -5px var(--tw-shadow-color),0 8px 10px -6px var(--tw-shadow-color)}.filter{filter:var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)}.backdrop-blur-sm{--tw-backdrop-blur:blur(4px);-webkit-backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia);backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)}.hover\:bg-amber-100:hover{--tw-bg-opacity:1;background-color:rgb(254 243 199/var(--tw-bg-opacity,1))}.hover\:bg-rose-100:hover{--tw-bg-opacity:1;background-color:rgb(255 228 230/var(--tw-bg-opacity,1))}.hover\:bg-slate-100:hover{--tw-bg-opacity:1;background-color:rgb(241 245 249/var(--tw-bg-opacity,1))}.hover\:bg-slate-200:hover{--tw-bg-opacity:1;background-color:rgb(226 232 240/var(--tw-bg-opacity,1))}.hover\:bg-slate-50:hover{--tw-bg-opacity:1;background-color:rgb(248 250 252/var(--tw-bg-opacity,1))}.hover\:bg-slate-900:hover{--tw-bg-opacity:1;background-color:rgb(15 23 42/var(--tw-bg-opacity,1))}.hover\:bg-white\/10:hover{background-color:hsla(0,0%,100%,.1)}.focus\:ring-2:focus{--tw-ring-offset-shadow:var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);--tw-ring-shadow:var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);box-shadow:var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow,0 0 #0000)}.focus\:ring-slate-500:focus{--tw-ring-opacity:1;--tw-ring-color:rgb(100 116 139/var(--tw-ring-opacity,1))}@media (min-width:768px){.md\:col-span-3{grid-column:span 3/span 3}.md\:w-64{width:16rem}.md\:w-auto{width:auto}.md\:grid-cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}.md\:grid-cols-4{grid-template-columns:repeat(4,minmax(0,1fr))}.md\:flex-row{flex-direction:row}.md\:items-center{align-items:center}}</style>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap');
+        body { font-family: 'Cairo', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+    <!-- AUTH CHECK LOADER -->
+    <div id="authLoading" class="min-h-screen flex items-center justify-center p-4">
+        <p id="authLoadingText" class="text-sm text-slate-400">جارٍ التحقق من الحساب...</p>
+    </div>
+
+    <!-- LOGIN SCREEN (مشرف فقط - لا يوجد إنشاء حساب هنا) -->
+    <div id="authScreen" class="hidden min-h-screen flex items-center justify-center p-4 bg-slate-50">
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 w-full max-w-sm p-6 space-y-5">
+            <div class="text-center space-y-1">
+                <div class="w-12 h-12 rounded-xl bg-slate-800 text-white flex items-center justify-center text-xl font-bold mx-auto">D</div>
+                <h1 class="text-lg font-bold text-slate-800">لوحة تحكم DENTRA</h1>
+                <p class="text-xs text-slate-500">حساب المشرف فقط</p>
+            </div>
+            <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">البريد الإلكتروني</label>
+                    <input type="email" id="loginEmail" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">كلمة المرور</label>
+                    <input type="password" id="loginPassword" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500">
+                </div>
+                <p id="loginError" class="text-xs text-rose-600 min-h-[16px]"></p>
+                <button type="submit" id="loginSubmitBtn" class="w-full py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-semibold shadow">تسجيل الدخول</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- UNAUTHORIZED SCREEN (حساب صحيح لكنه ليس المشرف) -->
+    <div id="unauthorizedScreen" class="hidden min-h-screen flex items-center justify-center p-4 bg-slate-50">
+        <div class="text-center space-y-3 max-w-sm">
+            <div class="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+                <i data-lucide="shield-off" class="w-6 h-6"></i>
+            </div>
+            <h2 class="font-bold text-slate-800">هذا الحساب غير مخوَّل</h2>
+            <p class="text-sm text-slate-500">لوحة التحكم هذه مخصصة لحساب المشرف فقط.</p>
+            <button onclick="handleLogout()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-semibold">تسجيل الخروج</button>
+        </div>
+    </div>
+
+    <!-- MAIN DASHBOARD -->
+    <div id="appShell" class="hidden">
+        <header class="bg-slate-800 text-white shadow-lg sticky top-0 z-40">
+            <div class="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center font-bold">D</div>
+                    <b>لوحة تحكم DENTRA</b>
+                </div>
+                <button onclick="handleLogout()" class="text-xs border border-white/20 px-3 py-1.5 rounded-lg hover:bg-white/10 flex items-center gap-1.5">
+                    <i data-lucide="log-out" class="w-3.5 h-3.5"></i> تسجيل الخروج
+                </button>
+            </div>
+        </header>
+
+        <main class="max-w-5xl mx-auto px-4 py-6 space-y-6">
+
+            <!-- إحصائيات سريعة -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div class="bg-white p-4 rounded-xl border border-slate-200 text-center">
+                    <div id="statTotal" class="text-2xl font-bold text-slate-800">-</div>
+                    <div class="text-xs text-slate-500 mt-1">إجمالي الأكواد</div>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-slate-200 text-center">
+                    <div id="statUnused" class="text-2xl font-bold text-slate-500">-</div>
+                    <div class="text-xs text-slate-500 mt-1">غير مستخدَم</div>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-slate-200 text-center">
+                    <div id="statActive" class="text-2xl font-bold text-emerald-600">-</div>
+                    <div class="text-xs text-slate-500 mt-1">مُفعَّل</div>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-slate-200 text-center">
+                    <div id="statRevoked" class="text-2xl font-bold text-rose-500">-</div>
+                    <div class="text-xs text-slate-500 mt-1">مُلغى</div>
+                </div>
+            </div>
+            <p id="statsNote" class="hidden text-xs text-slate-400 text-center"></p>
+
+            <!-- توليد دفعة أكواد جديدة -->
+            <div class="bg-white p-5 rounded-xl border border-slate-200 space-y-4">
+                <h2 class="font-bold text-slate-800 flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-5 h-5 text-slate-600"></i> توليد دفعة أكواد جديدة
+                </h2>
+                <form id="generateForm" onsubmit="handleGenerateCodes(event)" class="grid md:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">عدد الأكواد *</label>
+                        <input type="number" id="genCount" min="1" max="200" value="10" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">تاريخ انتهاء الدفعة *</label>
+                        <input type="date" id="genExpiresAt" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">تسمية الدفعة (اختياري)</label>
+                        <input type="text" id="genBatchLabel" placeholder="مثال: فصل خريف 2026" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500">
+                    </div>
+                    <div class="md:col-span-3">
+                        <button type="submit" id="generateSubmitBtn" class="w-full md:w-auto px-6 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-semibold shadow">توليد الأكواد</button>
+                    </div>
+                </form>
+
+                <!-- نتيجة التوليد -->
+                <div id="generatedResultBox" class="hidden border-t pt-4 space-y-2">
+                    <div class="flex justify-between items-center">
+                        <p class="text-sm font-semibold text-emerald-700">تم توليد <span id="generatedCount">0</span> كود بنجاح</p>
+                        <button onclick="copyGeneratedCodes()" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5">
+                            <i data-lucide="copy" class="w-3.5 h-3.5"></i> نسخ الكل
+                        </button>
+                    </div>
+                    <textarea id="generatedCodesText" readonly rows="6" class="w-full border rounded-lg px-3 py-2 text-xs font-mono bg-slate-50" dir="ltr"></textarea>
+                </div>
+            </div>
+
+            <!-- البحث والإدارة -->
+            <div class="bg-white p-5 rounded-xl border border-slate-200 space-y-4">
+                <div class="flex flex-col md:flex-row justify-between gap-3">
+                    <h2 class="font-bold text-slate-800 flex items-center gap-2">
+                        <i data-lucide="list" class="w-5 h-5 text-slate-600"></i> جميع الأكواد
+                    </h2>
+                    <div class="flex gap-2">
+                        <input type="text" id="searchCodesInput" oninput="renderCodesList()" placeholder="بحث بالكود أو تسمية الدفعة..." class="border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-500 w-full md:w-64">
+                        <select id="filterStatusSelect" onchange="renderCodesList()" class="border rounded-lg px-3 py-2 text-sm text-slate-600 focus:ring-2 focus:ring-slate-500">
+                            <option value="ALL">جميع الحالات</option>
+                            <option value="unused">غير مستخدَم</option>
+                            <option value="active">مُفعَّل</option>
+                            <option value="revoked">مُلغى</option>
+                        </select>
+                        <button onclick="loadCodes()" title="تحديث" class="border rounded-lg px-3 py-2 text-sm hover:bg-slate-50">
+                            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+                <div id="codesListContainer" class="space-y-2 max-h-[60vh] overflow-y-auto"></div>
+                <button id="loadMoreCodesBtn" type="button" onclick="loadCodes(true)" class="hidden w-full py-2 border rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-50">تحميل المزيد</button>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODERN CONFIRM DIALOG -->
+    <div id="confirmModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-[60]">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 space-y-4 text-center">
+            <p id="confirmModalMessage" class="text-sm text-slate-700 leading-6">هل أنت متأكد؟</p>
+            <div class="flex gap-2 pt-1">
+                <button type="button" onclick="closeConfirmModal()" class="flex-1 px-4 py-2 border rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-50">إلغاء</button>
+                <button type="button" onclick="confirmModalProceed()" class="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-semibold shadow">تأكيد</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // FIREBASE INITIALIZATION - نفس مشروع تطبيق الطلاب بالضبط
+        // ============================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyDK-4u3wmL4Ipov9RlnfNupIxR6C6thhQY",
+            authDomain: "dentra-clinical.firebaseapp.com",
+            projectId: "dentra-clinical",
+            storageBucket: "dentra-clinical.firebasestorage.app",
+            messagingSenderId: "630998875236",
+            appId: "1:630998875236:web:2fa4917066615dfcfe7371",
+            measurementId: "G-8N1XJVEHRT"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // UID حساب المشرف - يُستخدم فقط للفحص العرضي (تجربة استخدام أوضح)؛ الحماية
+        // الحقيقية غير القابلة للتجاوز موجودة في قواعد أمان Firestore نفسها (isAdmin())
+        const ADMIN_UID = 'YCq5chYle6OIoDGvpWBqYOJnViZ2';
+
+        let currentUser = null;
+        let codesCache = [];
+
+        function escapeHtml(value) {
+            if (value === null || value === undefined) return '';
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+        });
+
+        let _authResolved = false;
+        setTimeout(() => {
+            if (_authResolved) return;
+            const textEl = document.getElementById('authLoadingText');
+            if (textEl) textEl.textContent = 'تعذر التحقق من الحساب. تأكد من فتح الملف عبر رابط ويب (http/https) ومن اتصالك بالإنترنت، ثم أعد المحاولة.';
+        }, 10000);
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            const errEl = document.getElementById('loginError');
+            const btn = document.getElementById('loginSubmitBtn');
+            errEl.textContent = '';
+            btn.disabled = true; btn.textContent = 'جارٍ التحقق...';
+            try {
+                await auth.signInWithEmailAndPassword(email, password);
+            } catch (err) {
+                const map = {
+                    'auth/invalid-email': 'صيغة البريد الإلكتروني غير صحيحة',
+                    'auth/user-not-found': 'لا يوجد حساب بهذا البريد',
+                    'auth/wrong-password': 'كلمة المرور غير صحيحة',
+                    'auth/invalid-credential': 'البريد أو كلمة المرور غير صحيحة',
+                    'auth/network-request-failed': 'تعذر الاتصال، تحقق من الإنترنت'
+                };
+                errEl.textContent = map[err.code] || ('حدث خطأ: ' + (err.message || ''));
+            }
+            btn.disabled = false; btn.textContent = 'تسجيل الدخول';
+        }
+
+        function handleLogout() {
+            auth.signOut();
+        }
+
+        function showAuthScreen() {
+            _authResolved = true;
+            document.getElementById('authLoading').classList.add('hidden');
+            document.getElementById('unauthorizedScreen').classList.add('hidden');
+            document.getElementById('appShell').classList.add('hidden');
+            document.getElementById('authScreen').classList.remove('hidden');
+            document.getElementById('loginForm').reset();
+            document.getElementById('loginError').textContent = '';
+        }
+
+        function showUnauthorizedScreen() {
+            _authResolved = true;
+            document.getElementById('authLoading').classList.add('hidden');
+            document.getElementById('authScreen').classList.add('hidden');
+            document.getElementById('appShell').classList.add('hidden');
+            document.getElementById('unauthorizedScreen').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function showAppShell() {
+            _authResolved = true;
+            document.getElementById('authLoading').classList.add('hidden');
+            document.getElementById('authScreen').classList.add('hidden');
+            document.getElementById('unauthorizedScreen').classList.add('hidden');
+            document.getElementById('appShell').classList.remove('hidden');
+        }
+
+        auth.onAuthStateChanged(async (user) => {
+            if (!user) {
+                currentUser = null;
+                showAuthScreen();
+                return;
+            }
+            // فحص عرضي فقط لتجربة استخدام أوضح؛ الحماية الحقيقية في قواعد الأمان
+            if (user.uid !== ADMIN_UID) {
+                currentUser = null;
+                showUnauthorizedScreen();
+                return;
+            }
+            currentUser = user;
+            showAppShell();
+            lucide.createIcons();
+            initAdminApp();
+        });
+
+        function initAdminApp() {
+            // تعيين تاريخ افتراضي معقول (بعد 4 أشهر من اليوم) لحقل تاريخ الانتهاء
+            const d = new Date();
+            d.setMonth(d.getMonth() + 4);
+            document.getElementById('genExpiresAt').value = d.toISOString().slice(0, 10);
+            loadCodes();
+        }
+
+        // ============================================================
+        // MODERN CONFIRM DIALOG
+        // ============================================================
+        let _confirmCallback = null;
+        function showConfirmDialog(message, onConfirm) {
+            document.getElementById('confirmModalMessage').textContent = message;
+            _confirmCallback = onConfirm;
+            document.getElementById('confirmModal').classList.remove('hidden');
+            document.getElementById('confirmModal').classList.add('flex');
+        }
+        function closeConfirmModal() {
+            document.getElementById('confirmModal').classList.add('hidden');
+            document.getElementById('confirmModal').classList.remove('flex');
+            _confirmCallback = null;
+        }
+        function confirmModalProceed() {
+            const cb = _confirmCallback;
+            closeConfirmModal();
+            if (typeof cb === 'function') cb();
+        }
+
+        // ============================================================
+        // CODE GENERATION
+        // ============================================================
+        // استثناء الأحرف المتشابهة بصرياً (0/O, 1/I/L) لتسهيل كتابة الكود يدوياً من الطالب
+        const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+        // عشوائية مشفّرة (crypto.getRandomValues) مع رفض القيم المنحازة بدل Math.random
+        function secureRandomIndex(n) {
+            const limit = Math.floor(256 / n) * n;
+            const buf = new Uint8Array(1);
+            let x;
+            do { crypto.getRandomValues(buf); x = buf[0]; } while (x >= limit);
+            return x % n;
+        }
+
+        function generateRandomCode() {
+            function randPart(len) {
+                let s = '';
+                for (let i = 0; i < len; i++) s += CODE_CHARS[secureRandomIndex(CODE_CHARS.length)];
+                return s;
+            }
+            return `DENTRA-${randPart(4)}-${randPart(4)}-${randPart(4)}`;
+        }
+
+        async function handleGenerateCodes(e) {
+            e.preventDefault();
+            const count = parseInt(document.getElementById('genCount').value, 10);
+            const expiresAtStr = document.getElementById('genExpiresAt').value;
+            const batchLabel = document.getElementById('genBatchLabel').value.trim();
+            const btn = document.getElementById('generateSubmitBtn');
+
+            if (!count || count < 1 || count > 200) {
+                alert('عدد الأكواد يجب أن يكون بين 1 و200.');
+                return;
+            }
+            if (!expiresAtStr) {
+                alert('يرجى تحديد تاريخ انتهاء الدفعة.');
+                return;
+            }
+
+            btn.disabled = true; btn.textContent = 'جارٍ التوليد...';
+            try {
+                const expiresAt = firebase.firestore.Timestamp.fromDate(new Date(expiresAtStr + 'T23:59:59'));
+                const batch = db.batch();
+                const generated = [];
+                const usedInThisBatch = new Set();
+                let attempts = 0;
+
+                while (generated.length < count && attempts < count * 5) {
+                    attempts++;
+                    const code = generateRandomCode();
+                    if (usedInThisBatch.has(code)) continue;
+                    usedInThisBatch.add(code);
+                    const ref = db.collection('licenseCodes').doc(code);
+                    batch.set(ref, {
+                        status: 'unused',
+                        assignedToUid: null,
+                        deviceId: null,
+                        activatedAt: null,
+                        expiresAt: expiresAt,
+                        batchLabel: batchLabel,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    generated.push(code);
+                }
+
+                await batch.commit();
+
+                document.getElementById('generatedCount').textContent = generated.length;
+                document.getElementById('generatedCodesText').value = generated.join('\n');
+                document.getElementById('generatedResultBox').classList.remove('hidden');
+
+                loadCodes();
+            } catch (err) {
+                alert('تعذر توليد الأكواد: ' + err.message);
+            }
+            btn.disabled = false; btn.textContent = 'توليد الأكواد';
+        }
+
+        function copyGeneratedCodes() {
+            const textarea = document.getElementById('generatedCodesText');
+            textarea.select();
+            try {
+                navigator.clipboard.writeText(textarea.value);
+            } catch (err) {
+                document.execCommand('copy');
+            }
+        }
+
+        // ============================================================
+        // LISTING / SEARCH / MANAGEMENT
+        // ============================================================
+        let lastCodeDoc = null;
+        const CODES_PAGE_SIZE = 500;
+
+        async function loadCodes(append) {
+            try {
+                let q = db.collection('licenseCodes').orderBy('createdAt', 'desc').limit(CODES_PAGE_SIZE);
+                if (append === true && lastCodeDoc) q = q.startAfter(lastCodeDoc);
+                const snap = await q.get();
+                const rows = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+                codesCache = (append === true) ? codesCache.concat(rows) : rows;
+                if (snap.docs.length) lastCodeDoc = snap.docs[snap.docs.length - 1];
+                else if (append !== true) lastCodeDoc = null;
+                document.getElementById('loadMoreCodesBtn').classList.toggle('hidden', snap.docs.length < CODES_PAGE_SIZE);
+                renderStats();
+                renderCodesList();
+            } catch (err) {
+                console.error('تعذر تحميل الأكواد:', err);
+                document.getElementById('codesListContainer').innerHTML =
+                    '<p class="text-center text-rose-500 text-sm py-6">تعذر تحميل الأكواد. تحقق من اتصالك بالإنترنت.</p>';
+            }
+        }
+
+        function renderStats() {
+            document.getElementById('statTotal').textContent = codesCache.length;
+            document.getElementById('statUnused').textContent = codesCache.filter(c => c.status === 'unused').length;
+            document.getElementById('statActive').textContent = codesCache.filter(c => c.status === 'active').length;
+            document.getElementById('statRevoked').textContent = codesCache.filter(c => c.status === 'revoked').length;
+            const hasMore = !document.getElementById('loadMoreCodesBtn').classList.contains('hidden');
+            const note = document.getElementById('statsNote');
+            note.textContent = hasMore ? `الإحصائيات تخص ${codesCache.length} كوداً محمَّلاً فقط؛ اضغط «تحميل المزيد» لإضافة الباقي.` : '';
+            note.classList.toggle('hidden', !hasMore);
+        }
+
+        function statusBadge(status) {
+            const map = {
+                unused: 'bg-slate-100 text-slate-600',
+                active: 'bg-emerald-100 text-emerald-700',
+                revoked: 'bg-rose-100 text-rose-600'
+            };
+            const labels = { unused: 'غير مستخدَم', active: 'مُفعَّل', revoked: 'مُلغى' };
+            return `<span class="px-2 py-0.5 rounded text-[10px] font-bold ${map[status] || map.unused}">${labels[status] || status}</span>`;
+        }
+
+        function formatTimestamp(ts) {
+            if (!ts) return '-';
+            const d = ts.toDate ? ts.toDate() : new Date(ts);
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function renderCodesList() {
+            const search = (document.getElementById('searchCodesInput').value || '').trim().toUpperCase();
+            const filterStatus = document.getElementById('filterStatusSelect').value;
+            const container = document.getElementById('codesListContainer');
+
+            const filtered = codesCache.filter(c => {
+                const matchSearch = !search ||
+                    c.id.toUpperCase().includes(search) ||
+                    (c.batchLabel || '').toUpperCase().includes(search);
+                const matchStatus = filterStatus === 'ALL' || c.status === filterStatus;
+                return matchSearch && matchStatus;
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<p class="text-center text-slate-400 text-sm py-6">لا توجد أكواد مطابقة.</p>';
+                return;
+            }
+
+            container.innerHTML = filtered.map(c => `
+                <div class="border border-slate-200 rounded-lg p-3 flex flex-col md:flex-row md:items-center justify-between gap-2 text-sm">
+                    <div class="space-y-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="font-mono font-bold text-slate-800" dir="ltr">${escapeHtml(c.id)}</span>
+                            ${statusBadge(c.status)}
+                            ${c.batchLabel ? `<span class="text-[10px] text-slate-400">${escapeHtml(c.batchLabel)}</span>` : ''}
+                        </div>
+                        <div class="text-[11px] text-slate-500 flex flex-wrap gap-3">
+                            <span>الانتهاء: ${formatTimestamp(c.expiresAt)}</span>
+                            ${c.assignedToUid ? `<span dir="ltr">UID: ${escapeHtml(c.assignedToUid.slice(0, 12))}...</span>` : ''}
+                            ${c.deviceId ? `<span class="text-amber-600">مرتبط بجهاز</span>` : (c.status === 'active' ? `<span class="text-slate-400">بلا جهاز (قابل لإعادة التفعيل)</span>` : '')}
+                        </div>
+                    </div>
+                    <div class="flex gap-2 shrink-0">
+                        ${c.status === 'active' && c.deviceId ? `
+                            <button onclick="resetDevice('${c.id}')" class="text-xs bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-lg font-semibold">تصفير الجهاز</button>
+                        ` : ''}
+                        ${c.status !== 'revoked' ? `
+                            <button onclick="revokeCode('${c.id}')" class="text-xs bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-3 py-1.5 rounded-lg font-semibold">إلغاء</button>
+                        ` : ''}
+                        <button onclick="deleteCode('${c.id}')" class="text-xs bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200 px-3 py-1.5 rounded-lg font-semibold">حذف</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function resetDevice(code) {
+            showConfirmDialog(`تصفير الجهاز المرتبط بالكود ${code}؟ سيتمكن الطالب من تفعيله على جهاز جديد بنفس حسابه.`, async () => {
+                try {
+                    await db.collection('licenseCodes').doc(code).update({ deviceId: null });
+                    loadCodes();
+                } catch (err) {
+                    alert('تعذر تصفير الجهاز: ' + err.message);
+                }
+            });
+        }
+
+        function revokeCode(code) {
+            showConfirmDialog(`إلغاء الكود ${code} نهائياً؟ إن كان مُفعَّلاً فستتوقف عن الطالب الميزات المرخّصة (الصور الشعاعية وتجاوز الحدود المجانية) فوراً. لا يمكن التراجع عن هذا الإجراء.`, async () => {
+                try {
+                    await db.collection('licenseCodes').doc(code).update({ status: 'revoked' });
+                    loadCodes();
+                } catch (err) {
+                    alert('تعذر إلغاء الكود: ' + err.message);
+                }
+            });
+        }
+
+        function deleteCode(code) {
+            showConfirmDialog(`حذف الكود ${code} نهائياً من القائمة؟ إن كان مُفعَّلاً فستتوقف عن الطالب الميزات المرخّصة فوراً. (يُفضَّل استخدام "إلغاء" بدل الحذف للاحتفاظ بسجلّ الأكواد)`, async () => {
+                try {
+                    await db.collection('licenseCodes').doc(code).delete();
+                    loadCodes();
+                } catch (err) {
+                    alert('تعذر حذف الكود: ' + err.message);
+                }
+            });
+        }
+    </script>
+</body>
+</html>
