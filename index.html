@@ -813,6 +813,9 @@
         // ============================================================
         // LICENSE / FREE-TIER LIMITS
         // ============================================================
+        // تنبيه: هذه الحدود وفحوصها في الواجهة (savePatient/saveCase/handleXRayUpload...) لتحسين
+        // تجربة المستخدم فقط ولا تُعدّ حماية أمنية؛ العدّادات المحلية قابلة للتعديل من العميل.
+        // Requires Firestore Rules change — not fixed in this file (الفرض الحقيقي في Rules/backend).
         const FREE_PATIENT_LIMIT = 3;
         const FREE_CASE_LIMIT = 3;
 
@@ -828,6 +831,10 @@
             return Date.now() < expiresMillis;
         }
 
+        // للواجهة فقط (UI state): إظهار/إخفاء أزرار وتحسين التجربة. تعتمد على نسخة محلية من
+        // وثيقة الطالب وعلى ساعة الجهاز، فهي قابلة للتلاعب من العميل ولا تُعدّ أبداً مصدر
+        // صلاحية أو أمان. أي عملية حساسة (حدود الاستخدام، الميزات المدفوعة) يجب أن تُفرَض في
+        // Firestore Security Rules أو backend موثوق - لا هنا.
         function isLicenseActive() {
             return isLicenseActiveFromData(studentProfile && studentProfile.license);
         }
@@ -929,9 +936,14 @@
             }
         }
 
-        // يتحقق من كود التفعيل ويُفعِّله فعلياً. يتطلب إنترنت دوماً (خطوة حساسة أمنياً
-        // ولا تُحفظ محلياً بشكل متفائل كبقية العمليات). القرار النهائي غير القابل
-        // للتلاعب دوماً في قاعدة أمان Firestore، لا في هذا الكود
+        // يتحقق من كود التفعيل ويُفعِّله فعلياً داخل Firestore Transaction واحدة: قراءة الكود،
+        // التحقق من status وassignedToUid وdeviceId، وتحديث الكود ووثيقة الطالب معاً بشكل
+        // ذري (إمّا تنجح الكتابتان أو لا تنجح أي منهما، فلا يُستهلك كود بلا تفعيل الحساب).
+        // كما يمنع سباق حسابين على كود واحد: Firestore يُعيد تشغيل الـ transaction إن تغيّر
+        // مستند الكود بين القراءة والكتابة، فيرى الحساب الثاني status='active' لحساب آخر ويُرفض.
+        // يتطلب إنترنت دوماً (الـ transaction لا تعمل دون اتصال). مهم: هذا الكود لا يحلّ محلّ
+        // قواعد الأمان - العميل يمكنه تجاوز أي منطق هنا، والقرار النهائي في Firestore Rules.
+        // القيمة expiresAt تُنسخ كما هي من licenseCodes ولا يحدّدها المستخدم.
         async function activateLicenseCode(rawCode) {
             const code = (rawCode || '').trim().toUpperCase();
             if (!code) return { success: false, message: 'أدخل الكود أولاً.' };
@@ -939,57 +951,65 @@
             const uid = currentUser.uid;
             const deviceId = getDeviceId();
             const codeRef = db.collection('licenseCodes').doc(code);
+            const studentRef = db.collection('students').doc(uid);
 
             try {
-                const snap = await codeRef.get({ source: 'server' }); // قراءة حديثة دوماً لحالة حساسة كهذه
-                if (!snap.exists) return { success: false, message: 'كود غير صحيح.' };
-                const data = snap.data();
+                const outcome = await db.runTransaction(async (tx) => {
+                    const snap = await tx.get(codeRef);
+                    if (!snap.exists) return { ok: false, message: 'كود غير صحيح.' };
+                    const data = snap.data();
 
-                if (data.status === 'revoked') {
-                    return { success: false, message: 'تم إلغاء هذا الكود.' };
-                }
-
-                const now = Date.now();
-                const expiresMillis = data.expiresAt
-                    ? (data.expiresAt.toMillis ? data.expiresAt.toMillis() : new Date(data.expiresAt).getTime())
-                    : null;
-                if (expiresMillis !== null && now > expiresMillis) {
-                    return { success: false, message: 'انتهت صلاحية هذا الكود.' };
-                }
-
-                if (data.status === 'unused') {
-                    await codeRef.update({
-                        status: 'active',
-                        assignedToUid: uid,
-                        deviceId: deviceId,
-                        activatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                } else if (data.status === 'active') {
-                    if (data.assignedToUid !== uid) {
-                        return { success: false, message: 'هذا الكود مستخدَم بالفعل على حساب آخر.' };
+                    if (data.status === 'revoked') {
+                        return { ok: false, message: 'تم إلغاء هذا الكود.' };
                     }
-                    if (data.deviceId && data.deviceId !== deviceId) {
-                        return { success: false, message: 'هذا الكود مفعَّل بالفعل على جهاز آخر. تواصل معنا لإعادة التفعيل على هذا الجهاز.' };
-                    }
-                    if (!data.deviceId) {
-                        // إعادة تفعيل على جهاز جديد بعد تصفير الإدارة لحقل الجهاز
-                        await codeRef.update({ deviceId: deviceId });
-                    }
-                    // وإن كان الجهاز مطابقاً بالفعل: هذا الكود نشط على هذا الجهاز أصلاً، لا حاجة لتحديثه
-                }
 
-                // مزامنة حالة الترخيص في وثيقة الطالب - قاعدة الأمان تتحقق من وجود هذا
-                // الكود مطابقاً بالفعل في licenseCodes قبل قبول هذه الكتابة
-                await db.collection('students').doc(uid).set({
-                    license: {
-                        status: 'active',
-                        code: code,
-                        deviceId: deviceId,
-                        activatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                        expiresAt: data.expiresAt
+                    const expiresMillis = data.expiresAt
+                        ? (data.expiresAt.toMillis ? data.expiresAt.toMillis() : new Date(data.expiresAt).getTime())
+                        : null;
+                    if (expiresMillis !== null && Date.now() > expiresMillis) {
+                        return { ok: false, message: 'انتهت صلاحية هذا الكود.' };
                     }
-                }, { merge: true });
 
+                    if (data.status === 'unused') {
+                        tx.update(codeRef, {
+                            status: 'active',
+                            assignedToUid: uid,
+                            deviceId: deviceId,
+                            activatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    } else if (data.status === 'active') {
+                        if (data.assignedToUid !== uid) {
+                            return { ok: false, message: 'هذا الكود مستخدَم بالفعل على حساب آخر.' };
+                        }
+                        if (data.deviceId && data.deviceId !== deviceId) {
+                            return { ok: false, message: 'هذا الكود مفعَّل بالفعل على جهاز آخر. تواصل معنا لإعادة التفعيل على هذا الجهاز.' };
+                        }
+                        if (!data.deviceId) {
+                            // إعادة تفعيل على جهاز جديد بعد تصفير الإدارة لحقل الجهاز
+                            tx.update(codeRef, { deviceId: deviceId });
+                        }
+                        // وإن كان الجهاز مطابقاً بالفعل: الكود نشط على هذا الجهاز أصلاً، لا حاجة لتحديثه
+                        // (نُكمل فقط مزامنة وثيقة الطالب أدناه، وهذا ما يجعل إعادة إدخال الكود آمنة)
+                    } else {
+                        // أي حالة أخرى غير معروفة لا تُفعِّل شيئاً
+                        return { ok: false, message: 'هذا الكود غير صالح للتفعيل.' };
+                    }
+
+                    // مزامنة حالة الترخيص في وثيقة الطالب ضمن نفس الـ transaction
+                    tx.set(studentRef, {
+                        license: {
+                            status: 'active',
+                            code: code,
+                            deviceId: deviceId,
+                            activatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            expiresAt: data.expiresAt === undefined ? null : data.expiresAt
+                        }
+                    }, { merge: true });
+
+                    return { ok: true };
+                });
+
+                if (!outcome.ok) return { success: false, message: outcome.message };
                 return { success: true, message: 'تم تفعيل الحساب بنجاح! 🎉' };
             } catch (err) {
                 console.error('تعذر تفعيل الكود:', err);
@@ -998,42 +1018,27 @@
             }
         }
 
-        // يهيّئ عدّادات المرضى/الحالات وحقل license.expiresAt لحساب أُنشئ في مرحلة سابقة
-        // من التطوير قبل إضافة هذه الحقول. غياب هذه الحقول تماماً (لا مجرد null) يجعل
-        // قاعدة أمان Firestore ترفض عمليات هذا الحساب بالكامل (فحص isLicensed يحتاج
-        // قراءة license.expiresAt، وقراءة حقل غائب تماماً تُفشل تقييم القاعدة)
-        async function ensureCountersInitialized() {
-            const needsCounters = !(studentProfile && studentProfile.counters);
-            const needsExpiresAt = !(studentProfile && studentProfile.license &&
-                Object.prototype.hasOwnProperty.call(studentProfile.license, 'expiresAt'));
-            if (!needsCounters && !needsExpiresAt) return;
-
-            try {
-                const uid = currentUser.uid;
-                const studentRef = db.collection('students').doc(uid);
-                const patch = {};
-
-                if (needsCounters) {
-                    const [patientsCountSnap, casesCountSnap] = await Promise.all([
-                        studentRef.collection('patients').count().get(),
-                        studentRef.collection('cases').count().get()
-                    ]);
-                    patch.counters = {
-                        patients: patientsCountSnap.data().count,
-                        cases: casesCountSnap.data().count
-                    };
-                }
-
-                if (needsExpiresAt) {
-                    const currentLicense = (studentProfile && studentProfile.license) || { status: 'free', code: null, deviceId: null, activatedAt: null };
-                    patch.license = Object.assign({}, currentLicense, { expiresAt: currentLicense.expiresAt || null });
-                }
-
-                await studentRef.set(patch, { merge: true });
-                studentProfile = Object.assign({}, studentProfile, patch);
-            } catch (err) {
-                console.error('تعذر ترحيل بيانات الحساب القديمة:', err);
+        // تحقق فقط (بلا أي كتابة إلى Firestore): يفحص سلامة بيانات الحساب المحمَّلة ويسجّل تحذيراً
+        // في وحدة التحكم. سابقاً كانت الدالة (ensureCountersInitialized) تُعيد بناء counters من count()
+        // وتكتب license.expiresAt من العميل؛ هذا لم يعد مسموحاً لأن قواعد الأمان القادمة تمنع
+        // العميل من تعديل counters/license. لا تُهيَّأ أي عدّادات من العميل: حساب قديم بلا counters
+        // صالحة يجب أن يُهيَّأ من جهة موثوقة (إدارة/backend)، وإلى ذلك تُرفض إضافة مريض/حالة جديدة
+        // برسالة واضحة (انظر createDocWithCounterTx). حقل license.expiresAt الغائب لا يؤثر على
+        // منطق الواجهة (isLicenseActiveFromData تتعامل معه) ولا نكتب أي حقل ترخيص من العميل
+        function verifyStudentAccountState() {
+            const profile = studentProfile || {};
+            const countersOk = !!profile.counters &&
+                isValidCounterValue(profile.counters.patients) &&
+                isValidCounterValue(profile.counters.cases);
+            const licenseHasExpiresAt = !!(profile.license &&
+                Object.prototype.hasOwnProperty.call(profile.license, 'expiresAt'));
+            if (!countersOk) {
+                console.warn('عدّادات الحساب (counters) غير موجودة أو غير صالحة: لن تُنشأ من العميل. يلزم تهيئتها من جهة موثوقة.');
             }
+            if (!licenseHasExpiresAt) {
+                console.warn('حقل license.expiresAt غير موجود في وثيقة الطالب: لن يُكتب من العميل.');
+            }
+            return { countersOk: countersOk, licenseHasExpiresAt: licenseHasExpiresAt };
         }
 
         // ============================================================
@@ -1096,6 +1101,92 @@
             btn.disabled = false; btn.textContent = 'تسجيل الدخول';
         }
 
+        // علم يمنع مستمع onAuthStateChanged من تشغيل التطبيق أثناء خطوات التسجيل الحرجة
+        // (إنشاء حساب المصادقة ← إنشاء وثيقة الطالب). بدونه كان التطبيق يبدأ فور إنشاء حساب
+        // المصادقة، أي قبل التأكد من نجاح إنشاء students/{uid}، وكان ensureCountersInitialized
+        // قد يُنشئ وثيقة جزئية تُخفي فشل التسجيل الفعلي
+        let _signupInProgress = false;
+
+        // ينتظر وصول حدث "لا يوجد مستخدم" إلى مستمعي المصادقة (بحد أقصى مهلة قصيرة)، كي لا
+        // يُعاد ضبط شاشة الدخول ويُمسح نص الخطأ الذي سنعرضه للمستخدم بعد التنظيف
+        function waitForSignedOutEvent(timeoutMs = 2000) {
+            return new Promise(resolve => {
+                let finished = false;
+                let unsub = null;
+                const finish = () => {
+                    if (finished) return;
+                    finished = true;
+                    if (unsub) unsub();
+                    resolve();
+                };
+                unsub = auth.onAuthStateChanged(u => { if (!u) finish(); });
+                if (finished && unsub) unsub();
+                setTimeout(finish, timeoutMs);
+            });
+        }
+
+        // يسجّل حساب مصادقة يتيماً (بلا وثيقة طالب) تعذّر تنظيفه، للمراجعة اليدوية لاحقاً
+        function recordOrphanAuthAccount(uid, email, profileErr, cleanupErr) {
+            console.error('حساب مصادقة يتيم (بدون وثيقة طالب) تعذّر تنظيفه:', {
+                uid: uid,
+                email: email,
+                profileError: profileErr && (profileErr.code || profileErr.message),
+                cleanupError: cleanupErr && (cleanupErr.code || cleanupErr.message)
+            });
+            try {
+                const list = JSON.parse(localStorage.getItem('dentra_orphan_auth_accounts') || '[]');
+                list.push({
+                    uid: uid,
+                    email: email,
+                    at: new Date().toISOString(),
+                    profileError: profileErr && profileErr.code,
+                    cleanupError: cleanupErr && cleanupErr.code
+                });
+                localStorage.setItem('dentra_orphan_auth_accounts', JSON.stringify(list.slice(-20)));
+            } catch (_) { /* السجل المحلي للتشخيص فقط */ }
+        }
+
+        // يُنظّف حساب المصادقة الذي أُنشئ للتو في عملية التسجيل الحالية فقط، بعد فشل إنشاء
+        // students/{uid}. لا يمسّ أي حساب آخر: يتحقق أولاً أن المستخدم الحالي هو نفسه الحساب الجديد.
+        // يُرجع { recovered: true } إن تبيّن أن الوثيقة موجودة فعلاً على الخادم (الخطأ كان
+        // في الاستجابة فقط)، أو { recovered: false, message } برسالة للمستخدم
+        async function rollbackFailedSignup(createdUser, email, profileErr) {
+            const uid = createdUser.uid;
+            const errCode = (profileErr && profileErr.code) || 'unknown';
+
+            // أمان: لا نحذف شيئاً إلا إن كان المستخدم الحالي هو الحساب المُنشأ في هذه العملية
+            if (!auth.currentUser || auth.currentUser.uid !== uid) {
+                console.error('تخطّي تنظيف التسجيل: المستخدم الحالي ليس الحساب المُنشأ في هذه العملية.', uid);
+                return {
+                    recovered: false,
+                    message: `تعذر إكمال إنشاء الحساب [${errCode}]. لم يكتمل التسجيل. حاول مرة أخرى أو تواصل مع الدعم.`
+                };
+            }
+
+            // قد تكون الكتابة نجحت على الخادم رغم وصول خطأ للعميل؛ لا نحذف حساباً له وثيقة
+            try {
+                const snap = await db.collection('students').doc(uid).get({ source: 'server' });
+                if (snap.exists) return { recovered: true };
+            } catch (_) { /* لا نستطيع التأكد؛ نتابع التنظيف */ }
+
+            try {
+                await createdUser.delete();
+                await waitForSignedOutEvent();
+                return {
+                    recovered: false,
+                    message: `تعذر إنشاء ملف حسابك [${errCode}]، لذلك لم يُنشأ الحساب. يمكنك المحاولة مرة أخرى.`
+                };
+            } catch (deleteErr) {
+                recordOrphanAuthAccount(uid, email, profileErr, deleteErr);
+                try { await auth.signOut(); await waitForSignedOutEvent(); } catch (_) { /* لا شيء إضافي */ }
+                return {
+                    recovered: false,
+                    message: `لم يكتمل إنشاء الحساب [${errCode}]، وتعذر تنظيف بيانات الدخول المؤقتة [${(deleteErr && deleteErr.code) || 'unknown'}]. ` +
+                        'قد يظهر هذا البريد كمسجَّل مسبقاً؛ تواصل مع الدعم إن استمرت المشكلة.'
+                };
+            }
+        }
+
         async function handleSignup(e) {
             e.preventDefault();
             const email = document.getElementById('suEmail').value.trim();
@@ -1104,23 +1195,52 @@
             const btn = document.getElementById('signupSubmitBtn');
             errEl.textContent = '';
             btn.disabled = true; btn.textContent = 'جارٍ إنشاء الحساب...';
+
+            _signupInProgress = true;
+
+            // الخطوة 1: إنشاء حساب المصادقة. الفشل هنا لا يترك شيئاً خلفه
+            let createdUser = null;
             try {
                 const cred = await auth.createUserWithEmailAndPassword(email, password);
-                const profile = {
-                    email: email,
-                    name: document.getElementById('suName').value.trim(),
-                    university: document.getElementById('suUniversity').value,
-                    year: document.getElementById('suYear').value,
-                    phone: document.getElementById('suPhone').value.trim(),
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    license: { status: 'free', code: null, deviceId: null, activatedAt: null, expiresAt: null },
-                    counters: { patients: 0, cases: 0 },
-                    notes: ''
-                };
-                await db.collection('students').doc(cred.user.uid).set(profile);
-                // دالة onAuthStateChanged أدناه ستتولى عرض التطبيق تلقائياً
+                createdUser = cred.user;
             } catch (err) {
+                _signupInProgress = false;
                 errEl.textContent = translateAuthError(err);
+                btn.disabled = false; btn.textContent = 'إنشاء الحساب والبدء';
+                return;
+            }
+
+            // الخطوة 2: إنشاء وثيقة الطالب. عند فشلها نُنظّف حساب المصادقة الجديد فقط
+            const profile = {
+                email: email,
+                name: document.getElementById('suName').value.trim(),
+                university: document.getElementById('suUniversity').value,
+                year: document.getElementById('suYear').value,
+                phone: document.getElementById('suPhone').value.trim(),
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                license: { status: 'free', code: null, deviceId: null, activatedAt: null, expiresAt: null },
+                counters: { patients: 0, cases: 0 },
+                lastCounterOp: null,
+                notes: ''
+            };
+            let signupComplete = false;
+            try {
+                await db.collection('students').doc(createdUser.uid).set(profile);
+                signupComplete = true;
+            } catch (profileErr) {
+                console.error('فشل إنشاء وثيقة الطالب بعد إنشاء حساب المصادقة:', profileErr);
+                const rollback = await rollbackFailedSignup(createdUser, email, profileErr);
+                if (rollback.recovered) {
+                    signupComplete = true;
+                } else {
+                    errEl.textContent = rollback.message;
+                }
+            }
+
+            _signupInProgress = false;
+            if (signupComplete) {
+                // بدء التطبيق يدوياً لأن المستمع تجاهل أحداث المصادقة أثناء التسجيل
+                await startAppForUser(createdUser);
             }
             btn.disabled = false; btn.textContent = 'إنشاء الحساب والبدء';
         }
@@ -1152,26 +1272,55 @@
             errEl.textContent = '';
             btn.disabled = true; btn.textContent = 'جارٍ الحذف...';
             try {
-                await deleteAccountPermanently(password);
+                const outcome = await deleteAccountPermanently(password);
                 // لا حاجة لإغلاق النافذة يدوياً أو إعادة تفعيل الزر - onAuthStateChanged
                 // سيعرض شاشة الدخول تلقائياً فور نجاح حذف حساب المصادقة في الخطوة الأخيرة
+                if (outcome && outcome.unreleasedCodes && outcome.unreleasedCodes.length) {
+                    alert('تم حذف حسابك وبياناتك، لكن تعذر تحرير كود التفعيل تلقائياً (' +
+                        outcome.unreleasedCodes.join(', ') +
+                        '). يرجى التواصل مع الدعم لإعادة تحريره.');
+                }
             } catch (err) {
                 errEl.textContent = err.message || 'تعذر حذف الحساب، حاول مرة أخرى.';
                 btn.disabled = false; btn.textContent = 'حذف نهائياً';
             }
         }
 
-        // يحذف الحساب نهائياً بالترتيب الصحيح: إعادة تأكيد الهوية أولاً (متطلَّب من
-        // Firebase لعمليات حساسة كهذه) ← حذف كل بيانات Firestore بما فيها وثيقة الحساب
-        // (حرج) ← تحرير كود الترخيص (ثانوي) ← حذف حساب المصادقة نفسه (الخطوة الأخيرة
-        // دائماً، لأنها تُنهي الجلسة فوراً).
-        // ملاحظة: يجب أن يأتي تحرير الكود بعد حذف وثيقة الحساب تحديداً، لأن قاعدة الأمان
-        // لا تسمح للطالب بتحرير كوده إلا إذا لم تعد وثيقة حسابه موجودة - وإلا لاستطاع
-        // تحريره وتفعيله على حساب آخر مع بقاء حسابه الأول مفعَّلاً (مشاركة كود واحد)
+        // يحرّر كود ترخيص كان مرتبطاً بهذا الحساب، داخل transaction: لا يُغيّر الكود إلا إذا
+        // كان فعلاً "active" ومرتبطاً بنفس uid (لا نمسّ كوداً يخص حساباً آخر أبداً).
+        // يرمي الخطأ إن فشلت العملية نفسها؛ وترجع نتيجة نصية عند عدم الحاجة للتحرير
+        async function releaseLicenseCodeForUid(code, uid) {
+            const codeRef = db.collection('licenseCodes').doc(code);
+            return db.runTransaction(async (tx) => {
+                const snap = await tx.get(codeRef);
+                if (!snap.exists) return 'missing';
+                const d = snap.data();
+                if (d.assignedToUid !== uid) return 'not-owner';
+                if (d.status !== 'active') return 'not-active';
+                tx.update(codeRef, {
+                    status: 'unused', assignedToUid: null, deviceId: null, activatedAt: null
+                });
+                return 'released';
+            });
+        }
+
+        // يحذف الحساب نهائياً بترتيب قابل للاسترداد وإعادة المحاولة:
+        //  A) إعادة تأكيد الهوية (متطلَّب من Firebase لعمليات حساسة كهذه)
+        //  B) جمع ما نحتاجه قبل أي حذف: uid + كود الترخيص (قراءة حديثة من الخادم)
+        //  C) حذف كل بيانات Firestore على دفعات (≤ حد الـ batch) - وثيقة الطالب آخراً، وكل
+        //     خطوة تكرارية آمنة (idempotent): تُعيد فحص ما تبقّى على الخادم ولا تفشل لغياب عنصر
+        //  D) تحرير كود الترخيص (بعد حذف وثيقة الطالب، لأن قاعدة الأمان لا تسمح بتحريره قبل ذلك)
+        //  E) حذف حساب المصادقة - فقط بعد نجاح C، وهو آخر خطوة لأنه يُنهي الجلسة
+        // ملاحظة صريحة: هذه العملية من جهة العميل وليست atomic. أي فشل في المنتصف يُعرض كخطأ
+        // (لا نجاح كاذب) ويمكن إعادة المحاولة بأمان. الحذف الذري الحقيقي يتطلب Cloud Function /
+        // Admin SDK (recursiveDelete + حذف المستخدم + تحرير الكود في خطوة خادمية واحدة).
         async function deleteAccountPermanently(password) {
             const user = currentUser;
             const uid = user.uid;
+            const studentRef = db.collection('students').doc(uid);
+            const hintKey = 'dentra_pending_account_deletion';
 
+            // A) إعادة التحقق من هوية المستخدم
             try {
                 const credential = firebase.auth.EmailAuthProvider.credential(user.email, password);
                 await user.reauthenticateWithCredential(credential);
@@ -1182,36 +1331,102 @@
                 throw new Error(`تعذر تأكيد الهوية [${err.code || 'unknown'}]، تحقق من اتصالك بالإنترنت وحاول مرة أخرى.`);
             }
 
-            // نلتقط بيانات الترخيص قبل حذف وثيقة الحساب (نحتاج رمز الكود لتحريره لاحقاً)
-            const lic = (studentProfile && studentProfile.license) || {};
-            const codeToRelease = (lic.status === 'active' && lic.code) ? lic.code : null;
-
-            // حذف كل بيانات الحساب (حرج) - بنفس أسلوب الحذف المتسلسل المعتمد مسبقاً
+            // B) جمع المعلومات قبل الحذف. القراءة من الخادم مباشرة (لا نعتمد على نسخة محلية)
+            const codesToRelease = new Set();
+            let studentDocMissing = false;
             try {
-                const studentRef = db.collection('students').doc(uid);
-                await deleteAllInCollection(studentRef.collection('requirements'));
-                await deleteAllInCollection(studentRef.collection('appointments'));
-                await deleteAllInCollection(studentRef.collection('patients'));
-                await deleteAllCasesWithXrays(uid);
-                await studentRef.delete();
+                const freshSnap = await studentRef.get({ source: 'server' });
+                if (freshSnap.exists) {
+                    const lic = freshSnap.data().license || {};
+                    if (lic.status === 'active' && lic.code) codesToRelease.add(String(lic.code));
+                } else {
+                    studentDocMissing = true;
+                }
             } catch (err) {
-                throw new Error(`تعذر حذف بيانات الحساب [${err.code || 'unknown'}]: ${err.message}`);
+                throw new Error(`تعذر قراءة بيانات حسابك من الخادم قبل الحذف [${err.code || 'unknown'}]. لم يُحذف أي شيء؛ تحقق من اتصالك بالإنترنت وحاول مرة أخرى.`);
             }
 
-            // تحرير كود الترخيص (ثانوي) - لا نوقف حذف الحساب إن فشلت هذه الخطوة وحدها؛
-            // في هذه الحالة يبقى الكود "مفعَّلاً" لحساب محذوف ويحتاج معالجة يدوية من الإدارة
-            if (codeToRelease) {
+            // محاولة سابقة فشلت بعد حذف وثيقة الطالب؟ نستعيد الكود من "تلميح" محلي. هذا التلميح
+            // ليس مصدر صلاحية: التحرير الفعلي يتحقق من الخادم أن الكود مرتبط بهذا uid فعلاً
+            try {
+                const hint = JSON.parse(localStorage.getItem(hintKey) || 'null');
+                if (hint && hint.uid === uid && Array.isArray(hint.codes)) {
+                    hint.codes.forEach(c => { if (c) codesToRelease.add(String(c)); });
+                }
+            } catch (_) { /* تلميح تالف: نتجاهله */ }
+
+            // وثيقة الطالب غائبة أصلاً (محاولة سابقة): نبحث بأفضل جهد عن أكواد مرتبطة بهذا uid
+            if (studentDocMissing && codesToRelease.size === 0) {
                 try {
-                    await db.collection('licenseCodes').doc(codeToRelease).update({
-                        status: 'unused', assignedToUid: null, deviceId: null, activatedAt: null
-                    });
+                    const assigned = await db.collection('licenseCodes')
+                        .where('assignedToUid', '==', uid).get({ source: 'server' });
+                    assigned.forEach(d => codesToRelease.add(d.id));
                 } catch (err) {
-                    console.warn('تعذر تحرير كود الترخيص عند حذف الحساب:', err.code, err.message);
+                    console.warn('تعذر البحث عن أكواد مرتبطة بهذا الحساب (قد تمنعه قواعد الأمان):', err.code);
                 }
             }
 
-            // حذف حساب المصادقة نفسه - آخر خطوة دائماً
-            await user.delete();
+            if (codesToRelease.size > 0) {
+                try {
+                    localStorage.setItem(hintKey, JSON.stringify({ uid: uid, codes: Array.from(codesToRelease) }));
+                } catch (_) { /* التلميح اختياري */ }
+            }
+
+            // C) حذف بيانات Firestore (حرج). أي فشل: نتوقف ولا نلمس حساب المصادقة
+            try {
+                await deleteAllInCollection(studentRef.collection('requirements'));
+                await deleteAllInCollection(studentRef.collection('appointments'));
+                await deleteAllDocsWithCounters(
+                    studentRef,
+                    studentRef.collection('patients'),
+                    'patients'
+                );
+                await deleteAllDocsWithCounters(
+                    studentRef,
+                    studentRef.collection('cases'),
+                    'cases',
+                    (caseDoc) => deleteQueryInPages(
+                        caseDoc.ref.collection('xrays'),
+                        50
+                    )
+                );
+                await studentRef.delete();
+            } catch (err) {
+                throw new Error(`لم يكتمل حذف بيانات حسابك [${err.code || 'unknown'}]: ${err.message}. ` +
+                    'لم يتم حذف حسابك بعد، ويمكنك إعادة المحاولة بأمان.');
+            }
+
+            // D) تحرير كود الترخيص (ثانوي). فشله لا يوقف حذف الحساب (وإلا قد يعلق المستخدم بلا
+            // مخرج إن رفضت القواعد التحرير) لكنه يُسجَّل ويُعرض للمستخدم بوضوح بدل إخفائه
+            const unreleasedCodes = [];
+            for (const code of codesToRelease) {
+                let done = false;
+                let lastErr = null;
+                for (let attempt = 0; attempt < 2 && !done; attempt++) {
+                    try {
+                        await releaseLicenseCodeForUid(code, uid);
+                        done = true;
+                    } catch (err) {
+                        lastErr = err;
+                    }
+                }
+                if (!done) {
+                    unreleasedCodes.push(code);
+                    console.error('تعذر تحرير كود الترخيص عند حذف الحساب - يلزم تحريره يدوياً من الإدارة:',
+                        code, lastErr && lastErr.code, lastErr && lastErr.message);
+                }
+            }
+
+            // E) حذف حساب المصادقة نفسه - آخر خطوة، وفقط بعد نجاح حذف البيانات
+            try {
+                await user.delete();
+            } catch (err) {
+                throw new Error(`تم حذف بيانات حسابك، لكن تعذر حذف حساب الدخول نفسه [${err.code || 'unknown'}]. ` +
+                    'أعد المحاولة لإكمال الحذف (لن يتكرر أي حذف للبيانات).');
+            }
+
+            try { localStorage.removeItem(hintKey); } catch (_) { /* لا شيء */ }
+            return { unreleasedCodes: unreleasedCodes };
         }
 
         function showAuthScreen() {
@@ -1235,17 +1450,9 @@
             document.querySelector('main').classList.remove('hidden');
         }
 
-        auth.onAuthStateChanged(async (user) => {
-            if (!user) {
-                currentUser = null;
-                studentProfile = null;
-                // إلغاء كل مستمعي Firestore الحيّين فوراً؛ وإلا يبقون يعملون في الخلفية
-                // بلا فائدة (ويفشلون بخطأ صلاحيات غير ضروري بعد زوال جلسة المصادقة)
-                _firestoreUnsubscribers.forEach(unsub => unsub());
-                _firestoreUnsubscribers = [];
-                showAuthScreen();
-                return;
-            }
+        // يحمّل وثيقة الطالب ويشغّل التطبيق لمستخدم مصادَق عليه (مستخرَج من مستمع المصادقة
+        // ليُستدعى أيضاً بعد إكمال التسجيل بنجاح)
+        async function startAppForUser(user) {
             currentUser = user;
             try {
                 const doc = await db.collection('students').doc(user.uid).get();
@@ -1256,6 +1463,23 @@
             }
             showAppShell();
             initApp();
+        }
+
+        auth.onAuthStateChanged(async (user) => {
+            // أثناء التسجيل تتولى handleSignup البدء أو التنظيف بنفسها بعد التأكد من إنشاء
+            // وثيقة الطالب، فنتجاهل أحداث المصادقة الوسيطة
+            if (_signupInProgress) return;
+            if (!user) {
+                currentUser = null;
+                studentProfile = null;
+                // إلغاء كل مستمعي Firestore الحيّين فوراً؛ وإلا يبقون يعملون في الخلفية
+                // بلا فائدة (ويفشلون بخطأ صلاحيات غير ضروري بعد زوال جلسة المصادقة)
+                _firestoreUnsubscribers.forEach(unsub => unsub());
+                _firestoreUnsubscribers = [];
+                showAuthScreen();
+                return;
+            }
+            await startAppForUser(user);
         });
 
         // ============================================================
@@ -1271,7 +1495,7 @@
         function initApp() {
             lucide.createIcons();
             updateProfileUI(studentProfile || {});
-            ensureCountersInitialized();
+            verifyStudentAccountState();
             setupFirestoreListeners();
             renderUpperArch();
             renderLowerArch();
@@ -1476,43 +1700,230 @@
             event.target.value = '';
         }
 
-        // يحذف كل الوثائق ضمن مجموعة معينة (يُستخدم قبل الاسترجاع لضمان استبدال كامل
-        // للبيانات القديمة بدل دمجها مع الجديدة). يقرأ من الخادم مباشرة (source: 'server')
-        // بدل الاعتماد على أي نسخة محلية مؤقتة، ويكرر التحقق عدة مرات احتياطاً لضمان عدم
-        // بقاء أي وثيقة قديمة قد تتزامن مع بيانات الاسترجاع الجديدة وتظهر كتكرار
-        async function deleteAllInCollection(collectionRef) {
-            for (let attempt = 0; attempt < 4; attempt++) {
-                const snap = await collectionRef.get({ source: 'server' });
-                if (snap.empty) return;
+        // ============================================================
+        // BATCH HELPERS (موحَّدة لكل عمليات الكتابة/الحذف الجماعية)
+        // ============================================================
+        // حد Firestore الفعلي: 500 عملية لكل batch (وحوالي 10MiB لكل طلب). نستخدم هامش أمان
+        // أقل من الحد في الحالتين. لا تُنشئ batch يدوياً لعمليات قد تكبر - استخدم هذه الدوال
+        const FIRESTORE_BATCH_MAX_OPS = 400;
+        const FIRESTORE_BATCH_MAX_BYTES = 8 * 1024 * 1024;
+
+        // مُنشئات "عمليات" تُمرَّر إلى commitOpsInChunks. الحقول الاختيارية:
+        //  bytes: تقدير حجم العملية (للصور الكبيرة) - onCommit: يُستدعى بعد نجاح الـ chunk الحاوي لها
+        function batchDeleteOp(ref, extra) { return Object.assign({ type: 'delete', ref: ref }, extra || {}); }
+        function batchSetOp(ref, data, options, extra) { return Object.assign({ type: 'set', ref: ref, data: data, options: options || null }, extra || {}); }
+        function batchUpdateOp(ref, data, extra) { return Object.assign({ type: 'update', ref: ref, data: data }, extra || {}); }
+
+        // ينفّذ قائمة عمليات على chunks متتالية (كل chunk ≤ FIRESTORE_BATCH_MAX_OPS وحجمه ضمن الحد)،
+        // وينتظر نجاح كل chunk قبل الانتقال للتالي. عند فشل chunk يتوقف فوراً ويرمي الخطأ نفسه
+        // مضافاً إليه err.committedOps (عدد العمليات المثبَّتة فعلاً قبل الفشل) وerr.totalOps،
+        // ليعرف المستدعي بدقة ما الذي تحقق وما الذي لم يتحقق. كل chunk ذري لوحده لكن المجموعة
+        // ككل ليست ذرية (هذا حد Firestore لا يمكن تجاوزه من العميل)
+        async function commitOpsInChunks(ops) {
+            let index = 0;
+            let committed = 0;
+            while (index < ops.length) {
                 const batch = db.batch();
-                snap.forEach(doc => batch.delete(doc.ref));
-                await batch.commit();
+                const chunk = [];
+                let bytes = 0;
+                while (index < ops.length && chunk.length < FIRESTORE_BATCH_MAX_OPS) {
+                    const op = ops[index];
+                    const opBytes = op.bytes || 0;
+                    if (chunk.length > 0 && bytes + opBytes > FIRESTORE_BATCH_MAX_BYTES) break;
+                    if (op.type === 'delete') {
+                        batch.delete(op.ref);
+                    } else if (op.type === 'update') {
+                        batch.update(op.ref, op.data);
+                    } else if (op.options) {
+                        batch.set(op.ref, op.data, op.options);
+                    } else {
+                        batch.set(op.ref, op.data);
+                    }
+                    chunk.push(op);
+                    bytes += opBytes;
+                    index++;
+                }
+                try {
+                    await batch.commit();
+                } catch (err) {
+                    err.committedOps = committed;
+                    err.totalOps = ops.length;
+                    throw err;
+                }
+                committed += chunk.length;
+                chunk.forEach(op => {
+                    if (typeof op.onCommit === 'function') {
+                        try { op.onCommit(); } catch (cbErr) { console.error('خطأ في onCommit:', cbErr); }
+                    }
+                });
+            }
+            return committed;
+        }
+
+        // يحذف كل ما يعيده استعلام (أو مجموعة كاملة) على صفحات، قراءةً من الخادم مباشرة (لا
+        // من نسخة محلية مؤقتة). آمن للتكرار: يعيد الاستعلام بعد كل صفحة فيرى ما تبقّى فقط،
+        // ولا يفشل إن كان لا شيء ليُحذف. beforeDeletePage(docs) يُستدعى قبل حذف كل صفحة (يُستخدم
+        // لحذف المجموعات الفرعية أولاً). يتوقف بخطأ صريح إن ظهرت نفس الوثائق بعد "حذفها"
+        async function deleteQueryInPages(baseQuery, pageSize, beforeDeletePage) {
+            const size = Math.min(pageSize || 300, FIRESTORE_BATCH_MAX_OPS);
+            let total = 0;
+            let previousIds = null;
+            while (true) {
+                const snap = await baseQuery.limit(size).get({ source: 'server' });
+                if (snap.empty) return total;
+                const ids = snap.docs.map(d => d.id);
+                if (previousIds && ids.length === previousIds.length && ids.every((id, i) => id === previousIds[i])) {
+                    throw new Error('لم تُحذف بعض الوثائق فعلياً (ظهرت نفسها بعد الحذف).');
+                }
+                previousIds = ids;
+                if (beforeDeletePage) await beforeDeletePage(snap.docs);
+                await commitOpsInChunks(snap.docs.map(d => batchDeleteOp(d.ref)));
+                total += snap.size;
             }
         }
 
-        // يحذف كل الحالات مع صورها الشعاعية (المجموعات الفرعية) قبل الاسترجاع
+        // يحذف كل الوثائق ضمن مجموعة معينة (يُستخدم قبل الاسترجاع وعند حذف الحساب لضمان
+        // استبدال/إزالة كاملة للبيانات القديمة). على دفعات ≤ حد الـ batch، ويرمي الخطأ عند الفشل
+        async function deleteAllInCollection(collectionRef) {
+            await deleteQueryInPages(collectionRef, 300);
+        }
+
+        // يحذف كل الحالات مع صورها الشعاعية (المجموعات الفرعية). صور كل حالة تُحذف أولاً ثم
+        // وثيقة الحالة، فإن انقطعت العملية بقيت الحالة ظاهرة لإعادة المحاولة بدل أن تُترك
+        // صورها يتيمة (لا يمكن الوصول إليها بعد حذف وثيقتها الأم)
         async function deleteAllCasesWithXrays(uid) {
             const casesCollectionRef = db.collection('students').doc(uid).collection('cases');
-            for (let attempt = 0; attempt < 4; attempt++) {
-                const casesSnap = await casesCollectionRef.get({ source: 'server' });
-                if (casesSnap.empty) return;
-                const batch = db.batch();
-                for (const caseDoc of casesSnap.docs) {
-                    const xraysSnap = await caseDoc.ref.collection('xrays').get({ source: 'server' });
-                    xraysSnap.forEach(x => batch.delete(x.ref));
-                    batch.delete(caseDoc.ref);
+            await deleteQueryInPages(casesCollectionRef, 20, async (caseDocs) => {
+                for (const caseDoc of caseDocs) {
+                    await deleteQueryInPages(caseDoc.ref.collection('xrays'), 50);
                 }
-                await batch.commit();
+            });
+        }
+
+        // يحذف كل وثائق مجموعة (مرضى/حالات) واحدة واحدة، كل وثيقة في transaction تُنقص عدّادها
+        // (counters.<field> -= 1) مع حذفها. لا يُضبط العدّاد مباشرة من العميل أبداً. beforeEachDoc
+        // يُستدعى قبل حذف كل وثيقة (لحذف صورها الشعاعية أولاً). آمن للتكرار: الوثيقة المحذوفة
+        // سلفاً لا تُنقص العدّاد، ويُقرأ ما تبقّى من الخادم في كل جولة. يتوقف بخطأ صريح إن ظهرت
+        // نفس الوثائق بعد "حذفها"
+        async function deleteAllDocsWithCounters(studentRef, collectionRef, field, beforeEachDoc) {
+            let total = 0;
+            let previousIds = null;
+            while (true) {
+                const snap = await collectionRef.limit(20).get({ source: 'server' });
+                if (snap.empty) return total;
+                const ids = snap.docs.map(d => d.id);
+                if (previousIds && ids.length === previousIds.length && ids.every((id, i) => id === previousIds[i])) {
+                    throw new Error('لم تُحذف بعض الوثائق فعلياً (ظهرت نفسها بعد الحذف).');
+                }
+                previousIds = ids;
+                for (const doc of snap.docs) {
+                    if (beforeEachDoc) await beforeEachDoc(doc);
+                    await deleteDocWithCounterTx(studentRef, doc.ref, field);
+                    total++;
+                }
+            }
+        }
+
+        // فحص مسبق قبل أي حذف (لتفادي حالة مدمِّرة: حذف كل البيانات ثم الفشل عند المريض الرابع):
+        // يقرأ وثيقة الطالب من الخادم (قراءة فقط) ويرفض الاسترجاع إن كانت العدّادات غير صالحة، أو
+        // كان الحساب مجانياً والنسخة تتجاوز الحد. هذا فحص UX فقط: الفرض الحقيقي للحد داخل
+        // transaction الإنشاء (وسيكون في Firestore Security Rules) ولا نتجاوزه بأي شكل
+        async function assertRestoreAllowed(data) {
+            const uid = currentUser.uid;
+            let studentData = null;
+            try {
+                const snap = await db.collection('students').doc(uid).get({ source: 'server' });
+                studentData = snap.exists ? snap.data() : null;
+            } catch (err) {
+                const e = new Error(`تعذر قراءة بيانات حسابك من الخادم قبل الاسترجاع [${err.code || 'unknown'}]. لم يُحذف أي شيء.`);
+                e.code = err.code;
+                throw e;
+            }
+            if (!studentData || !studentData.counters ||
+                !isValidCounterValue(studentData.counters.patients) ||
+                !isValidCounterValue(studentData.counters.cases)) {
+                throw new Error('عدّادات حسابك غير متوفرة أو غير صالحة ولا يمكن إصلاحها من التطبيق، فلا يمكن الاسترجاع. لم يُحذف أي شيء. تواصل مع الدعم.');
+            }
+            if (!isLicenseActiveFromData(studentData.license)) {
+                // إنشاء الصور الشعاعية يتطلب ترخيصاً فعّالاً في قواعد الأمان (isLicensed): نرفض الاسترجاع
+                // بالكامل قبل حذف أي شيء بدل أن نحذف بياناتك ثم تُرفض الصور. (فحص UX؛ الفرض الحقيقي في Rules)
+                const xrayCount = (data.cases || []).reduce((n, c) => n + ((c && Array.isArray(c.xrays)) ? c.xrays.length : 0), 0);
+                if (xrayCount > 0) {
+                    throw new Error(`النسخة الاحتياطية تحتوي ${xrayCount} صورة شعاعية، واستعادة الصور الشعاعية تتطلب ترخيصاً فعّالاً ` +
+                        '(حسابك الحالي مجاني أو منتهي الترخيص). لم يُحذف أي شيء. فعّل حسابك بكود ثم أعد الاسترجاع.');
+                }
+                const uniqueCount = (list) => new Set((list || []).map((item, i) => (item && item.id) || ('__noid_' + i))).size;
+                const patientsCount = uniqueCount(data.patients);
+                const casesCount = uniqueCount(data.cases);
+                if (patientsCount > FREE_PATIENT_LIMIT || casesCount > FREE_CASE_LIMIT) {
+                    throw new Error(`النسخة الاحتياطية تحتوي ${patientsCount} مرضى و${casesCount} حالات، وهذا يتجاوز حد النسخة المجانية ` +
+                        `(${FREE_PATIENT_LIMIT} مرضى و${FREE_CASE_LIMIT} حالات). لم يُحذف أي شيء. فعّل حسابك بكود ثم أعد الاسترجاع.`);
+                }
+            }
+        }
+
+        // فحص مسبق (بلا أي كتابة ولا قراءة من الشبكة) لبنية السجلات كما ستُكتب فعلياً: قواعد الأمان
+        // تقبل إنشاء كل مستند فقط بمجموعة الحقول المحددة (hasAll + hasOnly)، فأي سجل في النسخة
+        // ينقصه حقل مطلوب أو فيه حقل غير مسموح كان سيُرفض أثناء الاسترجاع بعد أن تُحذف بياناتك.
+        // لذلك نتحقق منها الآن ونرفض قبل الحذف مع رسالة واضحة. (لا تُعدَّل أي بيانات هنا.)
+        // تنبيه صيانة: القوائم أدناه يجب أن تبقى مطابقة لـ firestore.rules (create) لكل مجموعة.
+        // createdAt لا يأتي من النسخة (يُكتب بـ serverTimestamp) فيُضاف إلى القائمتين مسبقاً.
+        function assertBackupMatchesRules(data) {
+            const SHAPES = {
+                'المرضى': { list: data.patients, required: ['name', 'age', 'phone', 'subject', 'odontogram', 'createdAt'], extra: [], skip: [] },
+                'الحالات': {
+                    list: data.cases,
+                    required: ['title', 'patientId', 'patientName', 'subject', 'tooth', 'status', 'complaint', 'diagnosis', 'plan', 'procedure', 'materials', 'complications', 'startDate', 'endDate', 'followUp', 'notes', 'createdAt'],
+                    extra: ['followUpAppointmentId'], skip: ['xrays']
+                },
+                'المتطلبات': { list: data.requirements, required: ['subject', 'goal', 'completed'], extra: [], skip: [], noCreatedAt: true },
+                'المواعيد': { list: data.appointments, required: ['patientId', 'patientName', 'date', 'time', 'notes', 'createdAt'], extra: [], skip: [] }
+            };
+            const problems = [];
+            let bad = 0;
+            for (const [label, shape] of Object.entries(SHAPES)) {
+                (shape.list || []).forEach((item, index) => {
+                    const keys = Object.keys(item || {}).filter(k => k !== 'id' && !shape.skip.includes(k) && item[k] !== undefined);
+                    if (!shape.noCreatedAt && !keys.includes('createdAt')) keys.push('createdAt');   // يُكتب بـ serverTimestamp
+                    const allowed = shape.required.concat(shape.extra);
+                    const missing = shape.required.filter(k => !keys.includes(k));
+                    const unknown = keys.filter(k => !allowed.includes(k));
+                    if (missing.length || unknown.length) {
+                        bad++;
+                        if (problems.length < 3) {
+                            problems.push(`${label} [${index + 1}${item && item.id ? ' / ' + item.id : ''}]` +
+                                (missing.length ? ` ينقصه: ${missing.join('، ')}` : '') +
+                                (unknown.length ? ` حقول غير مسموحة: ${unknown.join('، ')}` : ''));
+                        }
+                    }
+                });
+            }
+            if (bad > 0) {
+                throw new Error(`بنية ${bad} سجل في النسخة الاحتياطية لا تطابق البنية التي تقبلها قواعد الأمان، ولذلك لن يتم الاسترجاع. ` +
+                    `أمثلة: ${problems.join(' | ')}. لم يُحذف أي شيء.`);
             }
         }
 
         // يستعيد نسخة احتياطية كاملة إلى Firestore، مع الحفاظ على المعرّفات الأصلية
-        // للمرضى/الحالات كي تبقى الروابط بينها (patientId داخل كل حالة) سليمة بعد الاسترجاع
+        // للمرضى/الحالات كي تبقى الروابط بينها (patientId داخل كل حالة، وfollowUpAppointmentId
+        // ومعرّفات المواعيد) سليمة بعد الاسترجاع.
+        // العدّادات: لا تُكتب أي قيمة مطلقة إطلاقاً. كل مريض/حالة يُحذف ضمن transaction تُنقص
+        // العدّاد، وكل مريض/حالة يُنشأ ضمن transaction تزيده (createDocWithCounterTx) فيبقى
+        // العدّاد مطابقاً للواقع في كل لحظة، وحد النسخة المجانية يُفرَض عند الإنشاء نفسه.
+        // مهم: الاسترجاع ككل ليس ذرّياً (حدود Firestore + وثيقة لكل transaction). عند الفشل
+        // تُعرض المرحلة والتقدم، وإعادة الاسترجاع بنفس الملف آمنة (تستبدل كل شيء من جديد)
         async function restoreBackupData(data) {
             const uid = currentUser.uid;
+            const studentRef = db.collection('students').doc(uid);
+            let stage = 'التحقق من إمكانية الاسترجاع';
+            const progress = { patientsDeleted: 0, casesDeleted: 0, patientsCreated: 0, casesCreated: 0, xraysWritten: 0 };
             try {
+                await assertRestoreAllowed(data);
+                assertBackupMatchesRules(data);
+
                 if (data.profile) {
-                    await db.collection('students').doc(uid).set({
+                    stage = 'تحديث بيانات الملف الشخصي';
+                    await studentRef.set({
                         name: data.profile.name || '',
                         university: data.profile.university || '',
                         year: data.profile.year || '',
@@ -1521,71 +1932,97 @@
                 }
 
                 // استبدال كامل: حذف كل شيء أولاً لتفادي تعارض أو تكرار السجلات القديمة
-                await deleteAllInCollection(db.collection('students').doc(uid).collection('patients'));
-                await deleteAllCasesWithXrays(uid);
-                await deleteAllInCollection(db.collection('students').doc(uid).collection('requirements'));
-                await deleteAllInCollection(db.collection('students').doc(uid).collection('appointments'));
+                stage = 'حذف المرضى الحاليين';
+                progress.patientsDeleted = await deleteAllDocsWithCounters(studentRef, studentRef.collection('patients'), 'patients');
+                stage = 'حذف الحالات الحالية وصورها';
+                progress.casesDeleted = await deleteAllDocsWithCounters(studentRef, studentRef.collection('cases'), 'cases',
+                    (caseDoc) => deleteQueryInPages(caseDoc.ref.collection('xrays'), 50));
+                stage = 'حذف المتطلبات والمواعيد الحالية';
+                await deleteAllInCollection(studentRef.collection('requirements'));
+                await deleteAllInCollection(studentRef.collection('appointments'));
 
-                const patientsRef = db.collection('students').doc(uid).collection('patients');
-                const casesRef = db.collection('students').doc(uid).collection('cases');
-                const reqsRef = db.collection('students').doc(uid).collection('requirements');
-                const appsRef = db.collection('students').doc(uid).collection('appointments');
+                const patientsRef = studentRef.collection('patients');
+                const casesRef = studentRef.collection('cases');
+                const reqsRef = studentRef.collection('requirements');
+                const appsRef = studentRef.collection('appointments');
 
-                let batch = db.batch();
-                let opCount = 0;
-                const commitIfNeeded = async () => {
-                    if (opCount >= 400) { // هامش أمان تحت حد 500 عملية لكل batch في Firestore
-                        await batch.commit();
-                        batch = db.batch();
-                        opCount = 0;
-                    }
-                };
-
+                // إنشاء كل مريض + counters.patients += 1 في transaction واحدة. عند الوصول لحد
+                // النسخة المجانية (أو عدّاد غير صالح) يتوقف الاسترجاع بخطأ صريح دون تجاوز
+                stage = 'استرجاع المرضى';
                 for (const p of (data.patients || [])) {
                     const { id, ...rest } = p;
                     // نعيد تعيين createdAt بطابع وقت صالح جديد: الطابع الأصلي يفقد نوعه الخاص
-                    // (Timestamp) بعد المرور بـ JSON.stringify/JSON.parse، وaordBy('createdAt')
+                    // (Timestamp) بعد المرور بـ JSON.stringify/JSON.parse، وorderBy('createdAt')
                     // في مستمع المرضى يستبعد أي وثيقة بلا طابع وقت صالح - فتختفي من العرض تماماً
                     rest.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-                    batch.set(patientsRef.doc(id || patientsRef.doc().id), rest);
-                    opCount++; await commitIfNeeded();
+                    const patientRef = patientsRef.doc(id || patientsRef.doc().id);
+                    const result = await createDocWithCounterTx(studentRef, patientRef, rest, 'patients', FREE_PATIENT_LIMIT, null);
+                    if (result.status === 'limit') {
+                        const e = new Error(`وصلت إلى حد النسخة المجانية (${FREE_PATIENT_LIMIT} مرضى) أثناء الاسترجاع. لم يُتجاوز الحد.`);
+                        e.code = 'limit-reached';
+                        throw e;
+                    }
+                    if (result.status !== 'created' && result.status !== 'exists') {
+                        throw new Error('عدّاد المرضى في حسابك غير متوفر أو غير صالح، ولا يمكن إصلاحه من التطبيق.');
+                    }
+                    if (result.status === 'created') progress.patientsCreated++;
                 }
 
+                // إنشاء كل حالة + counters.cases += 1 في transaction واحدة، ثم صورها الشعاعية
+                // على chunks (خارج الـ transaction عمداً: لا داعي لتعقيدها بحدود الحجم)
+                stage = 'استرجاع الحالات وصورها';
                 for (const c of (data.cases || [])) {
                     const { id, xrays, ...rest } = c;
                     rest.createdAt = firebase.firestore.FieldValue.serverTimestamp(); // نفس سبب إصلاح المرضى أعلاه
                     const caseRef = casesRef.doc(id || casesRef.doc().id);
-                    batch.set(caseRef, rest);
-                    opCount++; await commitIfNeeded();
-                    if (Array.isArray(xrays)) {
-                        for (const xrayData of xrays) {
-                            batch.set(caseRef.collection('xrays').doc(), {
-                                data: xrayData,
-                                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                            });
-                            opCount++; await commitIfNeeded();
-                        }
+                    const result = await createDocWithCounterTx(studentRef, caseRef, rest, 'cases', FREE_CASE_LIMIT, null);
+                    if (result.status === 'limit') {
+                        const e = new Error(`وصلت إلى حد النسخة المجانية (${FREE_CASE_LIMIT} حالات) أثناء الاسترجاع. لم يُتجاوز الحد.`);
+                        e.code = 'limit-reached';
+                        throw e;
+                    }
+                    if (result.status !== 'created' && result.status !== 'exists') {
+                        throw new Error('عدّاد الحالات في حسابك غير متوفر أو غير صالح، ولا يمكن إصلاحه من التطبيق.');
+                    }
+                    if (result.status !== 'created') continue; // معرّف مكرّر داخل النسخة: لا نكرّر صوره
+                    progress.casesCreated++;
+                    if (Array.isArray(xrays) && xrays.length > 0) {
+                        const xrayOps = xrays.map(xrayData => batchSetOp(caseRef.collection('xrays').doc(), {
+                            data: xrayData,
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        }, null, { bytes: (typeof xrayData === 'string' ? xrayData.length : 0) + 1024 }));
+                        progress.xraysWritten += await commitOpsInChunks(xrayOps);
                     }
                 }
 
+                // المتطلبات والمواعيد ليست مرتبطة بالعدّادات: تبقى على chunks
+                stage = 'استرجاع المتطلبات والمواعيد';
+                const ops = [];
                 for (const r of (data.requirements || [])) {
                     const { id, ...rest } = r;
-                    batch.set(reqsRef.doc(id || reqsRef.doc().id), rest);
-                    opCount++; await commitIfNeeded();
+                    ops.push(batchSetOp(reqsRef.doc(id || reqsRef.doc().id), rest));
                 }
-
                 for (const a of (data.appointments || [])) {
                     const { id, ...rest } = a;
-                    batch.set(appsRef.doc(id || appsRef.doc().id), rest);
-                    opCount++; await commitIfNeeded();
+                    // قواعد الأمان تشترط createdAt == request.time (serverTimestamp): لا يمكن الاحتفاظ بتاريخ
+                    // الإنشاء الأصلي للموعد (لا حقل مسموح لتخزينه)، وهو غير مستخدم في عرض المواعيد أو ترتيبها
+                    rest.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                    ops.push(batchSetOp(appsRef.doc(id || appsRef.doc().id), rest));
                 }
-
-                await batch.commit();
+                await commitOpsInChunks(ops);
                 alert('تم استرجاع البيانات بنجاح!');
                 // لا حاجة لإعادة تحميل الصفحة أو المتطلبات يدوياً - المستمعون الحيّون
                 // (onSnapshot) سيحدّثون الواجهة تلقائياً بالنتيجة النهائية الصحيحة
             } catch (err) {
-                alert('تعذر استرجاع البيانات: ' + err.message);
+                const chunkInfo = (typeof err.committedOps === 'number')
+                    ? `\n(كُتبت ${err.committedOps} من ${err.totalOps} عملية في هذه المرحلة قبل التوقف)`
+                    : '';
+                const restoredInfo = `\nالتقدم حتى التوقف: حُذف ${progress.patientsDeleted} مرضى و${progress.casesDeleted} حالات، ` +
+                    `واستُرجع ${progress.patientsCreated} مرضى و${progress.casesCreated} حالات و${progress.xraysWritten} صورة.`;
+                const isPreflight = stage === 'التحقق من إمكانية الاسترجاع';
+                alert(`تعذر استرجاع البيانات [مرحلة: ${stage}]: ${err.message}${chunkInfo}` + (isPreflight ? '' :
+                    restoredInfo + '\nالاسترجاع ليس عملية ذرّية: قد تكون بياناتك الحالية حُذفت جزئياً. ' +
+                    'أعد الاسترجاع بنفس الملف لإكماله (يستبدل كل البيانات من جديد فلا يتكرر شيء، والعدّادات تبقى مطابقة للواقع).'));
             }
         }
 
@@ -1746,7 +2183,12 @@
             lucide.createIcons();
         }
 
+        // معرّف ثابت لمريض جديد قيد الحفظ: إعادة المحاولة بعد فشل ملتبس (انقطاع بعد نجاح الكتابة)
+        // تصل إلى نفس الوثيقة فلا يتكرر المريض ولا يُزاد العدّاد مرتين
+        let _pendingNewPatientId = null;
+
         function openPatientModal() {
+            _pendingNewPatientId = null;
             document.getElementById('patientForm').reset();
             document.getElementById('patientModal').classList.remove('hidden');
             document.getElementById('patientModal').classList.add('flex');
@@ -1768,85 +2210,94 @@
                 odontogram: {},
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             };
+            const limitMessage = `لقد وصلت إلى الحد الأقصى (${FREE_PATIENT_LIMIT} مرضى) في النسخة المجانية. أدخل كود تفعيل لإضافة عدد غير محدود من المرضى.`;
 
-            // فحص الحد المجاني من آخر عدّاد معروف محلياً (يعمل دون إنترنت). هذا الفحص
-            // للتجربة السريعة والواجهة فقط؛ الفحص الحاسم غير القابل للتجاوز سيكون في
-            // قاعدة أمان Firestore (المرحلة القادمة)، والتي قد ترفض هذه الإضافة لاحقاً
-            // عند المزامنة إن تبيّن تجاوز الحد فعلياً (حالة نادرة، راجع الشرح المرفق)
+            // فحص سريع من آخر عدّاد معروف محلياً: لتجربة المستخدم فقط وليس حماية أمنية.
+            // الفحص الحاسم داخل الـ transaction أدناه (من حالة الخادم)، والفرض الحقيقي
+            // سيكون في Firestore Security Rules (المرحلة القادمة)
             const counters = (studentProfile && studentProfile.counters) || { patients: 0, cases: 0 };
             if (!isLicenseActive() && (counters.patients || 0) >= FREE_PATIENT_LIMIT) {
                 closePatientModal();
-                showUpgradeModal(`لقد وصلت إلى الحد الأقصى (${FREE_PATIENT_LIMIT} مرضى) في النسخة المجانية. أدخل كود تفعيل لإضافة عدد غير محدود من المرضى.`);
+                showUpgradeModal(limitMessage);
                 return;
             }
 
             if (btn) { btn.disabled = true; }
             const uid = currentUser.uid;
             const studentRef = db.collection('students').doc(uid);
+            if (!_pendingNewPatientId) _pendingNewPatientId = studentRef.collection('patients').doc().id;
+            const patientRef = studentRef.collection('patients').doc(_pendingNewPatientId);
 
-            // الخطوة 1 (حرجة): إضافة المريض نفسه - يجب أن تنجح دائماً إن كان ضمن الحد
-            // المسموح (الفحص أعلاه) أو مفعَّلاً. مفصولة عن تحديث العدّاد أدناه لضمان
-            // نجاحها بغض النظر عن أي تعثّر عابر في تلك الخطوة الثانوية المحاسبية فقط
+            // إنشاء المريض + counters.patients += 1 في transaction واحدة (ذرّي). تتطلب اتصالاً
+            // بالإنترنت لأنها تقرأ العدّاد من الخادم
             try {
-                await studentRef.collection('patients').add(newPatient);
-                closePatientModal();
-                // renderPatients() سيُستدعى تلقائياً عبر المستمع (onSnapshot) فور نجاح الحفظ
+                const result = await createDocWithCounterTx(studentRef, patientRef, newPatient, 'patients', FREE_PATIENT_LIMIT, null);
+                if (result.status === 'created' || result.status === 'exists') {
+                    _pendingNewPatientId = null;
+                    closePatientModal();
+                    // renderPatients() سيُستدعى تلقائياً عبر المستمع (onSnapshot) فور نجاح الحفظ
+                } else if (result.status === 'limit') {
+                    _pendingNewPatientId = null;
+                    closePatientModal();
+                    showUpgradeModal(limitMessage);
+                } else {
+                    alert('تعذر حفظ المريض: بيانات عدّاد الحساب غير متوفرة أو غير صالحة، ولا يمكن إصلاحها من التطبيق. تواصل مع الدعم لتهيئة حسابك.');
+                }
             } catch (err) {
-                alert(`تعذر حفظ المريض [${err.code || 'unknown'}]: ${err.message}`);
-                if (btn) { btn.disabled = false; }
-                return;
-            }
-
-            // الخطوة 2 (ثانوية، محاسبية فقط): تحديث العدّاد
-            try {
-                await studentRef.set({
-                    counters: { patients: firebase.firestore.FieldValue.increment(1) }
-                }, { merge: true });
-            } catch (err) {
-                console.warn('تم حفظ المريض بنجاح، لكن تعذر تحديث العدّاد:', err.code, err.message);
+                const offlineHint = (err.code === 'unavailable') ? '\nإضافة مريض تتطلب اتصالاً بالإنترنت.' : '';
+                alert(`تعذر حفظ المريض [${err.code || 'unknown'}]: ${err.message}${offlineHint}`);
             }
             if (btn) { btn.disabled = false; }
         }
 
+        // يحذف المريض وكل ما يتبعه، بترتيب يجعل انقطاع العملية قابلاً للإكمال بإعادة المحاولة:
+        //   صور كل حالة ← مواعيد المريض (ومواعيد المتابعة المرتبطة بحالاته) ← الحالات ← المريض آخراً
+        // وثيقة المريض تُحذف أخيراً عمداً: طالما بقيت، يجدها المستخدم ويستطيع إعادة الحذف
+        // فتُكمل العملية ما تبقّى (لا حالات/صور/مواعيد يتيمة). كل خطوة آمنة للتكرار (idempotent).
+        // العدّادات: كل حالة تُحذف في transaction خاصة بها مع cases -= 1، والمريض في transaction
+        // خاصة به مع patients -= 1. فالعدّاد يتغيّر فقط مع حذف الوثيقة فعلاً وفي نفس العملية
+        // الذرّية، فلا انحراف عند الفشل الجزئي ولا إنقاص مزدوج عند إعادة المحاولة.
+        // (العملية الكلية ليست ذرّية: حدود الـ batch تفرض تقسيمها؛ الذرّي هو كل وثيقة + عدّادها)
+        // القراءات من الخادم مباشرة كي لا يفوتنا عنصر غير موجود في النسخة المحلية المؤقتة
         function deletePatient(pId) {
             showConfirmDialog('هل أنت متأكد من حذف هذا المريض وكل الحالات المربوطة به؟', async () => {
                 const uid = currentUser.uid;
                 const studentRef = db.collection('students').doc(uid);
-                let deletedCasesCount = 0;
+                const patientRef = studentRef.collection('patients').doc(pId);
 
-                // الخطوة 1 (حرجة، يجب أن تنجح دائماً): حذف المريض وكل حالاته وصورها.
-                // لا شرط معقّد على أي من هذه العمليات - فقط ملكية الحساب - فلا يوجد سبب
-                // منطقي لفشلها. مفصولة تماماً عن تحديث العدّاد أدناه لضمان نجاحها دائماً
-                // بغض النظر عن أي تعثّر عابر في تلك الخطوة الثانوية
                 try {
-                    const batch = db.batch();
-                    batch.delete(studentRef.collection('patients').doc(pId));
-
                     const casesSnap = await studentRef.collection('cases')
-                        .where('patientId', '==', pId).get();
-                    deletedCasesCount = casesSnap.size;
+                        .where('patientId', '==', pId).get({ source: 'server' });
+
+                    // (أ) صور كل حالة - على صفحات ≤ حد الـ batch
                     for (const caseDoc of casesSnap.docs) {
-                        await addCaseDeletionsToBatch(batch, uid, caseDoc.id);
+                        await deleteQueryInPages(caseDoc.ref.collection('xrays'), 50);
                     }
 
-                    await batch.commit();
-                } catch (err) {
-                    alert(`تعذر حذف المريض [${err.code || 'unknown'}]: ${err.message}`);
-                    return; // لا نحاول تحديث العدّاد إن فشل الحذف الفعلي نفسه
-                }
+                    // (ب) مواعيد المريض + مواعيد المتابعة المرتبطة بحالاته عبر followUpAppointmentId
+                    const apptRefs = new Map();
+                    const apptSnap = await studentRef.collection('appointments')
+                        .where('patientId', '==', pId).get({ source: 'server' });
+                    apptSnap.forEach(d => apptRefs.set(d.id, d.ref));
+                    const extraIds = casesSnap.docs
+                        .map(d => d.data().followUpAppointmentId)
+                        .filter(id => id && !apptRefs.has(id));
+                    (await resolveExistingAppointmentRefs(studentRef, extraIds))
+                        .forEach(ref => apptRefs.set(ref.id, ref));
+                    if (apptRefs.size > 0) {
+                        await commitOpsInChunks(Array.from(apptRefs.values()).map(ref => batchDeleteOp(ref)));
+                    }
 
-                // الخطوة 2 (ثانوية، محاسبية فقط): تحديث العدّاد. إن فشلت هذه الخطوة تحديداً
-                // لأي سبب، لا نُظهر أي خطأ للمستخدم - المريض والحالات حُذفوا فعلياً بنجاح
-                // فعلاً، وهذا ما يهمّه. مجرد تسجيل صامت في وحدة التحكم للمراجعة الفنية فقط
-                try {
-                    await studentRef.set({
-                        counters: {
-                            patients: firebase.firestore.FieldValue.increment(-1),
-                            cases: firebase.firestore.FieldValue.increment(-deletedCasesCount)
-                        }
-                    }, { merge: true });
+                    // (ج) الحالات: كل حالة + عدّادها في transaction مستقلة (لا batch مشترك)
+                    for (const caseDoc of casesSnap.docs) {
+                        await deleteDocWithCounterTx(studentRef, caseDoc.ref, 'cases');
+                    }
+
+                    // (د) المريض آخراً + counters.patients -= 1 في transaction واحدة
+                    await deleteDocWithCounterTx(studentRef, patientRef, 'patients');
                 } catch (err) {
-                    console.warn('تم حذف المريض بنجاح، لكن تعذر تحديث العدّاد:', err.code, err.message);
+                    alert(`تعذر إكمال حذف المريض [${err.code || 'unknown'}]: ${err.message}\n` +
+                        'لم يُحذف المريض بالكامل بعد. يمكنك إعادة المحاولة بأمان وستُكمل العملية ما تبقّى.');
                 }
             });
         }
@@ -1858,18 +2309,120 @@
         //  - id: معرّف وثيقة موجودة فعلاً ضمن المجموعة الفرعية xrays الخاصة بالحالة
         let currentXRayEntries = [];
         let pendingXRayDeletions = []; // معرّفات صور محذوفة أثناء هذه الجلسة تحتاج حذفاً فعلياً عند الحفظ
+        let _pendingNewCaseId = null;  // معرّف ثابت لحالة جديدة قيد الحفظ (لتفادي التكرار عند إعادة المحاولة)
 
-        // يضيف إلى batch حذفَ حالة سريرية واحدة بكل صورها الشعاعية (المجموعة الفرعية xrays)
-        // Firestore لا يحذف المجموعات الفرعية تلقائياً عند حذف الوثيقة الأم، لذا يجب تفريغها يدوياً
-        async function addCaseDeletionsToBatch(batch, uid, caseId) {
-            const caseRef = db.collection('students').doc(uid).collection('cases').doc(caseId);
-            try {
-                const xraysSnap = await caseRef.collection('xrays').get();
-                xraysSnap.forEach(d => batch.delete(d.ref));
-            } catch (err) {
-                console.error('تعذر جلب صور الحالة لحذفها:', err);
+        // معرّف موعد المتابعة الخاص بحالة معيّنة: حتمي (deterministic) ومشتق من معرّف الحالة،
+        // فأي إعادة محاولة (حتى بعد فشل جزئي أو انقطاع) تكتب على نفس الموعد ولا تُنشئ نسخة ثانية.
+        // يُخزَّن أيضاً في وثيقة الحالة (followUpAppointmentId) ليكون الربط صريحاً ومباشراً
+        function followUpAppointmentIdFor(caseId) {
+            return 'fu_' + caseId;
+        }
+
+        // يعيد مراجع المواعيد الموجودة فعلاً على الخادم من قائمة معرّفات (يتجاهل الغائب منها)،
+        // فلا نُرسل حذفاً لوثيقة غير موجودة
+        async function resolveExistingAppointmentRefs(studentRef, ids) {
+            const unique = Array.from(new Set((ids || []).filter(Boolean)));
+            const snaps = await Promise.all(unique.map(id =>
+                studentRef.collection('appointments').doc(id).get({ source: 'server' })));
+            return snaps.filter(s => s.exists).map(s => s.ref);
+        }
+
+        // ============================================================
+        // COUNTERS (counters.patients / counters.cases)
+        // ============================================================
+        // مبدأ التصميم: العدّاد يتغيّر فقط ضمن نفس عملية الكتابة الذرية التي تُنشئ/تحذف
+        // الوثيقة نفسها (Firestore transaction)، بحيث يمكن لقواعد الأمان لاحقاً التحقق من
+        // النتيجة النهائية بـ getAfter(). العميل لا يرسل أبداً قيمة مطلقة للعدّاد؛ فقط
+        // FieldValue.increment(+1/-1)، وعبر update بمسار حقل محدد ('counters.cases') كي لا
+        // تُستبدل وثيقة students ولا حقل license ولا أي حقل آخر.
+        // تنبيه: هذا كله منطق عميل - الحماية الفعلية ستكون في Firestore Security Rules (لم تُكتب بعد).
+        function isValidCounterValue(v) {
+            return typeof v === 'number' && Number.isInteger(v) && v >= 0;
+        }
+
+        // يبني تحديث العدّاد أو يرجع null إن كان سيكسر الثابت (integer >= 0): عدّاد غير موجود/
+        // غير صحيح، أو تغيير غير ±1، أو نزول تحت الصفر. لا يُنتج أبداً قيمة سالبة
+        function buildCounterUpdate(studentData, field, delta) {
+            if (delta !== 1 && delta !== -1) return null;
+            if (field !== 'patients' && field !== 'cases') return null;
+            const counters = studentData && studentData.counters;
+            if (!counters || !isValidCounterValue(counters[field])) return null;
+            if (counters[field] + delta < 0) return null;
+            return { ['counters.' + field]: firebase.firestore.FieldValue.increment(delta) };
+        }
+
+        // إنشاء وثيقة (مريض/حالة) + counters.<field> += 1 في transaction واحدة (ذرّي فعلاً):
+        //  - القراءة من الخادم (transaction لا تقرأ من الكاش)
+        //  - حساب مجاني وصل الحد ← 'limit' (بلا أي كتابة)؛ حساب مفعَّل ← مسموح
+        //    (قراءة license هنا للعرض/تجربة المستخدم فقط ولا تُعدَّل بأي شكل)
+        //  - عدّاد غير صالح ← 'bad-counters' (بلا أي كتابة)
+        //  - الوثيقة موجودة مسبقاً بنفس المعرّف (إعادة محاولة بعد فشل ملتبس) ← 'exists': لا زيادة ثانية
+        // النتائج: created | exists | limit | bad-counters | no-student
+        // lastCounterOp: مع كل تغيير للعدّاد يُكتب في وثيقة الطالب (نفس الـ transaction) حقل
+        // lastCounterOp = { field, docId, delta } يربط التعديل بالوثيقة التي سبّبته، كي تتحقق
+        // قواعد الأمان (لاحقاً) من أن أي تعديل لـ counters يقابله إنشاء/حذف وثيقة مطابقة. القيمة
+        // تُبنى داخلياً فقط من field (patients|cases) وdocRef.id وdelta ثابت (+1 هنا)؛ لا تأتي من
+        // أي مدخل خارجي. (تنبيه: هذا لا يحمي شيئاً بمفرده؛ الحماية الفعلية في Rules)
+        async function createDocWithCounterTx(studentRef, docRef, data, field, freeLimit, dataIfExists) {
+            if (field !== 'patients' && field !== 'cases') {
+                throw new Error('حقل عدّاد غير مسموح: ' + String(field));
             }
-            batch.delete(caseRef);
+            return db.runTransaction(async (tx) => {
+                const studentSnap = await tx.get(studentRef);
+                const docSnap = await tx.get(docRef);
+                if (docSnap.exists) {
+                    if (dataIfExists) tx.set(docRef, dataIfExists, { merge: true });
+                    return { status: 'exists' };
+                }
+                if (!studentSnap.exists) return { status: 'no-student' };
+                const studentData = studentSnap.data();
+                const update = buildCounterUpdate(studentData, field, 1);
+                if (!update) return { status: 'bad-counters' };
+                if (!isLicenseActiveFromData(studentData.license) && studentData.counters[field] >= freeLimit) {
+                    return { status: 'limit' };
+                }
+                update.lastCounterOp = { field: field, docId: docRef.id, delta: 1 };
+                tx.set(docRef, data);
+                tx.update(studentRef, update);
+                return { status: 'created' };
+            });
+        }
+
+        // حذف وثيقة (مريض/حالة) + counters.<field> -= 1 في transaction واحدة (ذرّي فعلاً):
+        //  - لا إنقاص إلا إن كانت الوثيقة موجودة فعلاً وقت التنفيذ ← إعادة المحاولة (الوثيقة
+        //    محذوفة أصلاً) لا تُنقص العدّاد ثانية
+        //  - لا إنقاص إن كان سينزل العدّاد تحت الصفر (انحراف قديم): يُحذف المستند ويُسجَّل تحذير
+        //  - relatedRefsFn(docSnap): وثائق تابعة (مثل موعد المتابعة) تُحذف ضمن نفس الـ transaction
+        //    إن كانت موجودة (تُقرأ أولاً لأن Firestore يشترط القراءات قبل الكتابات)
+        // نفس مبدأ lastCounterOp أعلاه بـ delta = -1؛ ولا يُكتب lastCounterOp إن لم تكن الوثيقة
+        // موجودة أو لم يتغيّر العدّاد
+        async function deleteDocWithCounterTx(studentRef, docRef, field, relatedRefsFn) {
+            if (field !== 'patients' && field !== 'cases') {
+                throw new Error('حقل عدّاد غير مسموح: ' + String(field));
+            }
+            return db.runTransaction(async (tx) => {
+                const studentSnap = await tx.get(studentRef);
+                const docSnap = await tx.get(docRef);
+                const related = [];
+                if (relatedRefsFn) {
+                    const seen = new Set();
+                    for (const ref of relatedRefsFn(docSnap)) {
+                        if (!ref || seen.has(ref.path)) continue;
+                        seen.add(ref.path);
+                        const relSnap = await tx.get(ref);
+                        if (relSnap.exists) related.push(ref);
+                    }
+                }
+                related.forEach(ref => tx.delete(ref));
+                if (!docSnap.exists) return { deleted: false, counterUpdated: false };
+                tx.delete(docRef);
+                const update = studentSnap.exists ? buildCounterUpdate(studentSnap.data(), field, -1) : null;
+                if (update) {
+                    update.lastCounterOp = { field: field, docId: docRef.id, delta: -1 };
+                    tx.update(studentRef, update);
+                } else console.warn('تم الحذف لكن لم يُنقَص العدّاد (' + field + '): قيمته غير صالحة أو صفر.');
+                return { deleted: true, counterUpdated: !!update };
+            });
         }
 
         function renderCases() {
@@ -1937,6 +2490,7 @@
             document.getElementById('caseForm').reset();
             currentXRayEntries = [];
             pendingXRayDeletions = [];
+            _pendingNewCaseId = null;
             document.getElementById('xrayPreviewContainer').innerHTML = '';
             document.getElementById('cId').value = '';
             document.getElementById('caseModalTitle').textContent = caseId ? 'تعديل بيانات الحالة السريرية' : 'إضافة حالة سريرية جديدة';
@@ -1959,6 +2513,9 @@
                     document.getElementById('cStartDate').value = c.startDate || '';
                     document.getElementById('cEndDate').value = c.endDate || '';
                     document.getElementById('cFollowUp').value = c.followUp || '';
+                    // الحالة المرتبطة بموعد متابعة تُفتح والمزامنة مفعّلة، كي لا يُعتبر عدم التأشير
+                    // طلباً ضمنياً لحذف الموعد المرتبط عند أي حفظ لاحق
+                    document.getElementById('cSyncAppointment').checked = !!c.followUpAppointmentId;
                     document.getElementById('cNotes').value = c.notes || '';
 
                     // تحميل الصور الشعاعية المحفوظة فعلياً لهذه الحالة من Firestore
@@ -1982,6 +2539,7 @@
             document.getElementById('caseModal').classList.remove('flex');
             currentXRayEntries = [];
             pendingXRayDeletions = [];
+            _pendingNewCaseId = null;
         }
 
         // يطبع تقرير الحالة السريرية الحالية (من بيانات نافذة التعديل مباشرة، حتى لو لم
@@ -2130,6 +2688,13 @@
             });
         }
 
+        // حفظ الحالة على مراحل منفصلة يعرف الكود الفرق بينها:
+        //   1) وثيقة الحالة + الصور الشعاعية (على chunks) - أول chunk يضم وثيقة الحالة
+        //   2) تحديث عدّاد الحالات (لحالة جديدة فقط)
+        //   3) موعد المتابعة (إنشاء/تحديث/حذف) - مرتبط بالحالة عبر followUpAppointmentId
+        // فشل مرحلة لاحقة بعد نجاح الحالة لا يُعرض أبداً كأن الحالة لم تُحفظ، وإعادة الضغط على
+        // "حفظ" آمنة: نفس معرّف الحالة (cId يُثبَّت بعد نجاحها)، ونفس معرّفات الصور (pendingId)،
+        // ونفس معرّف الموعد (حتمي) - فلا تتكرر حالة ولا صورة ولا موعد
         async function saveCase(e) {
             e.preventDefault();
             const patientSelect = document.getElementById('cPatientSelect');
@@ -2139,7 +2704,10 @@
             }
             const existingCaseId = document.getElementById('cId').value;
             const isNew = !existingCaseId;
-            const caseId = existingCaseId || ('c_' + Date.now());
+            // معرّف الحالة الجديدة يُولَّد مرة واحدة لكل فتح للنافذة، كي لا تنتج إعادة المحاولة
+            // بعد فشل ملتبس حالة مكرَّرة بمعرّف مختلف
+            if (isNew && !_pendingNewCaseId) _pendingNewCaseId = 'c_' + Date.now();
+            const caseId = existingCaseId || _pendingNewCaseId;
             const patientName = patientSelect.options[patientSelect.selectedIndex].getAttribute('data-name');
 
             const caseData = {
@@ -2172,7 +2740,8 @@
             }
 
             // فحص الحد المجاني من آخر عدّاد معروف محلياً عند إضافة حالة جديدة فقط (يعمل
-            // دون إنترنت). فحص سريع للواجهة، والفحص الحاسم سيكون في قاعدة الأمان لاحقاً
+            // دون إنترنت). هذا فحص لتجربة المستخدم فقط وليس حماية أمنية: الفرض الحقيقي
+            // للحد يجب أن يكون في Firestore Security Rules أو backend موثوق
             if (isNew) {
                 const counters = (studentProfile && studentProfile.counters) || { patients: 0, cases: 0 };
                 if (!isLicenseActive() && (counters.cases || 0) >= FREE_CASE_LIMIT) {
@@ -2190,54 +2759,133 @@
             const uid = currentUser.uid;
             const studentRef = db.collection('students').doc(uid);
             const caseRef = studentRef.collection('cases').doc(caseId);
+            const appointmentsRef = studentRef.collection('appointments');
 
-            // الخطوة 1 (حرجة): حفظ الحالة نفسها وصورها الشعاعية - يجب أن تنجح دائماً.
-            // مفصولة عن تحديث العدّاد أدناه لضمان نجاحها بغض النظر عن أي تعثّر عابر في
-            // تلك الخطوة الثانوية المحاسبية فقط
+            // تحديد المطلوب لموعد المتابعة: يُوجَد موعد إذا وُجد تاريخ متابعة وطُلبت المزامنة
+            const syncFollowUp = !!(document.getElementById('cSyncAppointment').checked && caseData.followUp);
+            const previousCase = isNew ? null : casesCache.find(c => c.id === caseId);
+            const linkedApptId = (previousCase && previousCase.followUpAppointmentId) || null;
+            const followUpApptId = syncFollowUp ? (linkedApptId || followUpAppointmentIdFor(caseId)) : null;
+            // المرجع يُكتب مع الحالة عند وجود موعد مطلوب. عند إزالة المتابعة لا نمسح المرجع هنا؛
+            // يُمسح فقط بعد نجاح حذف الموعد فعلاً (المرحلة 3)، وإلا فقدنا الرابط بموعد لم يُحذف
+            if (syncFollowUp) caseData.followUpAppointmentId = followUpApptId;
+
+            const state = { caseSaved: false, xraysOk: true, apptOk: true, xrayError: null, apptError: null };
+
+            // المرحلة 1: الحالة + الصور الشعاعية
+            const ops = [];
+            if (isNew) {
+                // حالة جديدة: إنشاء الحالة + counters.cases += 1 في transaction واحدة (ذرّي).
+                // الصور تُكتب بعدها على chunks منفصلة (لا يمكن ضمّها ذرّياً مع الحالة بسبب حدود
+                // الـ batch وحجم الصور)؛ فشلها لا يُلغي الحالة ولا العدّاد وتُعاد المحاولة بأمان
+                const dataIfExists = Object.assign({}, caseData);
+                delete dataIfExists.createdAt;
+                let created;
+                try {
+                    created = await createDocWithCounterTx(studentRef, caseRef, caseData, 'cases', FREE_CASE_LIMIT, dataIfExists);
+                } catch (err) {
+                    console.error('فشل إنشاء الحالة:', err);
+                    const offlineHint = (err.code === 'unavailable') ? '\nإضافة حالة جديدة تتطلب اتصالاً بالإنترنت.' : '';
+                    alert(`تعذر حفظ الحالة [${err.code || 'unknown'}]: ${err.message}${offlineHint}`);
+                    if (submitBtn) submitBtn.disabled = false;
+                    return;
+                }
+                if (created.status === 'limit') {
+                    closeCaseModal();
+                    showUpgradeModal(`لقد وصلت إلى الحد الأقصى (${FREE_CASE_LIMIT} حالات سريرية) في النسخة المجانية. أدخل كود تفعيل لإضافة عدد غير محدود من الحالات.`);
+                    if (submitBtn) submitBtn.disabled = false;
+                    return;
+                }
+                if (created.status !== 'created' && created.status !== 'exists') {
+                    alert('تعذر حفظ الحالة: بيانات عدّاد الحساب غير متوفرة أو غير صالحة، ولا يمكن إصلاحها من التطبيق. تواصل مع الدعم لتهيئة حسابك.');
+                    if (submitBtn) submitBtn.disabled = false;
+                    return;
+                }
+                state.caseSaved = true;
+                // بعد نجاح الحالة تُعامَل أي إعادة حفظ كتعديل لنفس الحالة (لا حالة جديدة/عدّاد مضاعف)
+                document.getElementById('cId').value = caseId;
+            } else {
+                ops.push(batchSetOp(caseRef, caseData, { merge: true }, {
+                    onCommit: () => { state.caseSaved = true; }
+                }));
+            }
+            // حذف الصور التي أُزيلت أثناء هذه الجلسة
+            pendingXRayDeletions.slice().forEach(delId => {
+                ops.push(batchDeleteOp(caseRef.collection('xrays').doc(delId), {
+                    onCommit: () => { pendingXRayDeletions = pendingXRayDeletions.filter(i => i !== delId); }
+                }));
+            });
+            // إضافة الصور الجديدة فقط (التي ليس لها معرّف Firestore بعد) بمعرّف ثابت لكل صورة
+            currentXRayEntries.filter(x => !x.id).forEach(x => {
+                if (!x.pendingId) x.pendingId = caseRef.collection('xrays').doc().id;
+                ops.push(batchSetOp(caseRef.collection('xrays').doc(x.pendingId), {
+                    data: x.data,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, null, {
+                    bytes: (typeof x.data === 'string' ? x.data.length : 0) + 1024,
+                    onCommit: () => { x.id = x.pendingId; }
+                }));
+            });
+
             try {
-                const batch = db.batch();
-                batch.set(caseRef, caseData, { merge: !isNew });
+                await commitOpsInChunks(ops);
+            } catch (err) {
+                console.error('فشل حفظ الحالة/الصور:', err);
+                if (!state.caseSaved) {
+                    // لم تُثبَّت الحالة نفسها: لا شيء حُفظ، والفشل حقيقي
+                    alert(`تعذر حفظ الحالة [${err.code || 'unknown'}]: ${err.message}`);
+                    if (submitBtn) submitBtn.disabled = false;
+                    return;
+                }
+                state.xraysOk = false;
+                state.xrayError = err;
+            }
 
-                // حذف الصور التي أُزيلت أثناء هذه الجلسة
-                pendingXRayDeletions.forEach(delId => {
-                    batch.delete(caseRef.collection('xrays').doc(delId));
-                });
-                // إضافة الصور الجديدة فقط (التي ليس لها معرّف Firestore بعد)
-                currentXRayEntries.filter(x => !x.id).forEach(x => {
-                    const newRef = caseRef.collection('xrays').doc();
-                    batch.set(newRef, { data: x.data, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-                });
-
-                await batch.commit();
-
-                // مزامنة موعد المتابعة التلقائي مع جدول المواعيد إن طُلب ذلك
-                if (document.getElementById('cSyncAppointment').checked && caseData.followUp) {
-                    await db.collection('students').doc(uid).collection('appointments').add({
+            // المرحلة 2: موعد المتابعة (العدّاد صار جزءاً من transaction الإنشاء في المرحلة 1)
+            try {
+                if (syncFollowUp) {
+                    const apptRef = appointmentsRef.doc(followUpApptId);
+                    const existingAppt = appointmentsCache.find(a => a.id === followUpApptId);
+                    const apptData = {
                         patientId: caseData.patientId,
                         patientName: caseData.patientName,
                         date: caseData.followUp,
-                        time: '09:00',
-                        notes: `متابعة حالة: ${caseData.title}`,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
+                        notes: `متابعة حالة: ${caseData.title}`
+                    };
+                    if (!existingAppt) {
+                        apptData.time = '09:00';
+                        apptData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                    }
+                    // set + merge على معرّف ثابت: ينشئ الموعد إن لم يوجد ويحدّثه إن وُجد (لا تكرار أبداً)
+                    await apptRef.set(apptData, { merge: true });
+                } else if (linkedApptId) {
+                    // إزالة المتابعة: حذف الموعد المرتبط ومسح المرجع من الحالة معاً في batch واحدة
+                    await commitOpsInChunks([
+                        batchDeleteOp(appointmentsRef.doc(linkedApptId)),
+                        batchUpdateOp(caseRef, { followUpAppointmentId: firebase.firestore.FieldValue.delete() })
+                    ]);
                 }
-
-                closeCaseModal();
             } catch (err) {
-                alert(`تعذر حفظ الحالة [${err.code || 'unknown'}]: ${err.message}`);
-                if (submitBtn) submitBtn.disabled = false;
-                return;
+                console.error('فشل مزامنة موعد المتابعة:', err);
+                state.apptOk = false;
+                state.apptError = err;
             }
 
-            // الخطوة 2 (ثانوية، محاسبية فقط): تحديث العدّاد عند إضافة حالة جديدة فقط
-            if (isNew) {
-                try {
-                    await studentRef.set({
-                        counters: { cases: firebase.firestore.FieldValue.increment(1) }
-                    }, { merge: true });
-                } catch (err) {
-                    console.warn('تم حفظ الحالة بنجاح، لكن تعذر تحديث العدّاد:', err.code, err.message);
+            if (state.xraysOk && state.apptOk) {
+                closeCaseModal();
+            } else {
+                // الحالة نفسها حُفظت بنجاح؛ نُبلغ بدقة عمّا تعثّر فقط، وتبقى النافذة مفتوحة على
+                // نفس الحالة لإعادة المحاولة بضغط "حفظ الحالة" دون أي تكرار
+                const problems = [];
+                if (!state.xraysOk) {
+                    problems.push(`تعذر حفظ/حذف بعض الصور الشعاعية [${state.xrayError.code || 'unknown'}]`);
                 }
+                if (!state.apptOk) {
+                    problems.push(`تعذرت مزامنة موعد المتابعة [${state.apptError.code || 'unknown'}]`);
+                }
+                alert('تم حفظ الحالة نفسها بنجاح، لكن: ' + problems.join(' و') + '.\n' +
+                    'لا تُنشئ الحالة من جديد: النافذة ما زالت مفتوحة على نفس الحالة، ' +
+                    'اضغط "حفظ الحالة" مرة أخرى لإعادة المحاولة دون تكرار.');
             }
             if (submitBtn) submitBtn.disabled = false;
         }
@@ -2246,27 +2894,32 @@
             openCaseModal(id);
         }
 
+        // يحذف الحالة مع صورها الشعاعية وموعد المتابعة المرتبط بها فقط (عبر followUpAppointmentId
+        // أو المعرّف الحتمي الخاص بالحالة) - لا يمسّ أي موعد آخر. الترتيب: الصور (صفحات) ثم
+        // transaction واحدة تحذف وثيقة الحالة + موعدها + counters.cases -= 1 معاً (ذرّياً)،
+        // فإن انقطعت العملية بقيت الحالة ظاهرة ويمكن إعادة الحذف بأمان. الوثيقة المحذوفة سلفاً
+        // لا تُنقص العدّاد ثانية. حذف الصور متعدد الصفحات وليس جزءاً من الـ transaction
+        // (حدود Firestore)، لكنه لا يمسّ العدّاد.
         function deleteCase(id) {
             showConfirmDialog('هل أنت متأكد من حذف هذه الحالة السريرية؟', async () => {
                 const uid = currentUser.uid;
+                const studentRef = db.collection('students').doc(uid);
+                const caseRef = studentRef.collection('cases').doc(id);
 
-                // الخطوة 1 (حرجة): حذف الحالة وصورها - يجب أن تنجح دائماً
                 try {
-                    const batch = db.batch();
-                    await addCaseDeletionsToBatch(batch, uid, id);
-                    await batch.commit();
-                } catch (err) {
-                    alert(`تعذر حذف الحالة [${err.code || 'unknown'}]: ${err.message}`);
-                    return;
-                }
+                    // الصور أولاً (على صفحات ≤ حد الـ batch). تُحذف حتى لو كانت وثيقة الحالة غائبة
+                    // (بقايا محاولة سابقة)، لأنها لا تُرى ولا تُحذف بعدها بأي طريقة أخرى
+                    await deleteQueryInPages(caseRef.collection('xrays'), 50);
 
-                // الخطوة 2 (ثانوية، محاسبية فقط): تحديث العدّاد
-                try {
-                    await db.collection('students').doc(uid).set({
-                        counters: { cases: firebase.firestore.FieldValue.increment(-1) }
-                    }, { merge: true });
+                    await deleteDocWithCounterTx(studentRef, caseRef, 'cases', (caseSnap) => {
+                        const linked = caseSnap.exists ? caseSnap.data().followUpAppointmentId : null;
+                        return [linked, followUpAppointmentIdFor(id)]
+                            .filter(Boolean)
+                            .map(apptId => studentRef.collection('appointments').doc(apptId));
+                    });
                 } catch (err) {
-                    console.warn('تم حذف الحالة بنجاح، لكن تعذر تحديث العدّاد:', err.code, err.message);
+                    alert(`تعذر حذف الحالة [${err.code || 'unknown'}]: ${err.message}\n` +
+                        'يمكنك إعادة المحاولة بأمان.');
                 }
             });
         }
@@ -2496,9 +3149,22 @@
         }
 
         function deleteAppointment(id) {
-            showConfirmDialog('هل أنت متأكد من حذف هذا الموعد؟', () => {
-                db.collection('students').doc(currentUser.uid).collection('appointments').doc(id).delete()
-                    .catch(err => alert('تعذر حذف الموعد: ' + err.message));
+            showConfirmDialog('هل أنت متأكد من حذف هذا الموعد؟', async () => {
+                const studentRef = db.collection('students').doc(currentUser.uid);
+                // إن كان الموعد هو موعد المتابعة المرتبط بحالة، نمسح المرجع منها في نفس الـ batch
+                // كي لا يبقى مرجع يشير إلى موعد محذوف فيُعاد إنشاؤه تلقائياً عند أي تعديل لاحق للحالة
+                const linkedCase = casesCache.find(c => c.followUpAppointmentId === id);
+                const ops = [batchDeleteOp(studentRef.collection('appointments').doc(id))];
+                if (linkedCase) {
+                    ops.push(batchUpdateOp(studentRef.collection('cases').doc(linkedCase.id), {
+                        followUpAppointmentId: firebase.firestore.FieldValue.delete()
+                    }));
+                }
+                try {
+                    await commitOpsInChunks(ops);
+                } catch (err) {
+                    alert('تعذر حذف الموعد: ' + err.message);
+                }
             });
         }
 
