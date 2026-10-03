@@ -13,7 +13,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics-compat.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap');
         body { font-family: 'Cairo', sans-serif; }
@@ -66,6 +65,7 @@
                     <label class="block text-xs font-semibold text-slate-600 mb-1">كلمة المرور</label>
                     <input type="password" id="loginPassword" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
                 </div>
+                <div class="text-end -mt-1"><button type="button" onclick="handleForgotPassword()" class="text-xs text-teal-600 font-semibold hover:underline">نسيت كلمة المرور؟</button></div>
                 <p id="loginError" class="text-xs text-rose-600 min-h-[16px]"></p>
                 <button type="submit" id="loginSubmitBtn" class="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-semibold shadow">تسجيل الدخول</button>
                 <p class="text-xs text-center text-slate-500">ليس لديك حساب؟ <button type="button" onclick="showSignupForm()" class="text-teal-600 font-semibold hover:underline">إنشاء حساب جديد</button></p>
@@ -735,7 +735,7 @@
             <h3 class="font-bold text-slate-800 text-center">تفعيل الحساب</h3>
             <p class="text-xs text-slate-500 text-center leading-5">أدخل كود التفعيل الذي حصلت عليه لفتح جميع الميزات وإزالة حدود النسخة المجانية.</p>
             <form id="activateCodeForm" onsubmit="handleActivateCode(event)" class="space-y-3">
-                <input type="text" id="activateCodeInput" required placeholder="مثال: DENTRA-XXXX-XXXX" class="w-full border rounded-lg px-3 py-2.5 text-sm text-center tracking-widest focus:outline-none focus:ring-2 focus:ring-teal-500" style="text-transform: uppercase;">
+                <input type="text" id="activateCodeInput" required placeholder="مثال: DENTRA-XXXX-XXXX-XXXX" class="w-full border rounded-lg px-3 py-2.5 text-sm text-center tracking-widest focus:outline-none focus:ring-2 focus:ring-teal-500" style="text-transform: uppercase;">
                 <p id="activateCodeError" class="text-xs text-rose-600 min-h-[16px] text-center"></p>
                 <div class="flex gap-2">
                     <button type="button" onclick="closeActivateCodeModal()" class="flex-1 px-4 py-2 border rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-50">إلغاء</button>
@@ -761,7 +761,6 @@
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
-        try { firebase.analytics(); } catch (e) { /* لا نعطّل التطبيق إن تعذّر تحميل Analytics */ }
 
         // تفعيل التخزين المؤقت (Offline Persistence) ليعمل التطبيق دون إنترنت
         // بعد أول تحميل ناجح للبيانات من الخادم
@@ -836,8 +835,50 @@
         // صلاحية أو أمان. أي عملية حساسة (حدود الاستخدام، الميزات المدفوعة) يجب أن تُفرَض في
         // Firestore Security Rules أو backend موثوق - لا هنا.
         function isLicenseActive() {
-            return isLicenseActiveFromData(studentProfile && studentProfile.license);
+            return !_licenseRevokedRemote && isLicenseActiveFromData(studentProfile && studentProfile.license);
         }
+
+        // حالة الكود على الخادم (للواجهة فقط): true = كود الحساب ملغى أو محذوف أو غير موجود في وثيقة الترخيص.
+        // لا يغيّرها إلا verifyLicenseWithServer، وتحتاج إنترنت؛ دون اتصال تبقى القيمة السابقة ويعمل التطبيق كالمعتاد.
+        // الفرض الحقيقي في قواعد الأمان (isLicensed تقرأ licenseCodes/{code}) وليس هنا.
+        let _licenseRevokedRemote = false;
+        let _licenseCheck = { code: null, at: 0 };
+        const LICENSE_RECHECK_MS = 10 * 60 * 1000;
+
+        function refreshLicenseDependentUI() {
+            if (!studentProfile) return;
+            updateProfileUI(studentProfile);
+            renderDashboard();
+        }
+
+        async function verifyLicenseWithServer(force) {
+            const lic = studentProfile && studentProfile.license;
+            if (!lic || lic.status !== 'active') {
+                if (_licenseRevokedRemote) { _licenseRevokedRemote = false; refreshLicenseDependentUI(); }
+                return;
+            }
+            // ترخيص مفعَّل بلا كود نصّي: قواعد الأمان تعدّه غير مرخَّص (isLicensed تشترط code)
+            if (typeof lic.code !== 'string' || !lic.code) {
+                if (!_licenseRevokedRemote) { _licenseRevokedRemote = true; refreshLicenseDependentUI(); }
+                return;
+            }
+            if (!navigator.onLine) return;
+            const now = Date.now();
+            if (!force && _licenseCheck.code === lic.code && now - _licenseCheck.at < LICENSE_RECHECK_MS) return;
+            _licenseCheck = { code: lic.code, at: now };
+            try {
+                const snap = await db.collection('licenseCodes').doc(lic.code).get({ source: 'server' });
+                const revoked = !snap.exists || ((snap.data() || {}).status !== 'active');
+                if (revoked !== _licenseRevokedRemote) { _licenseRevokedRemote = revoked; refreshLicenseDependentUI(); }
+            } catch (err) {
+                _licenseCheck.at = 0; // دون اتصال أو خطأ مؤقت: لا نغيّر الحالة ونعيد المحاولة في الفحص التالي
+            }
+        }
+
+        window.addEventListener('online', () => { verifyLicenseWithServer(true); });
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') verifyLicenseWithServer();
+        });
 
         function showUpgradeModal(message) {
             document.getElementById('upgradeModalMessage').textContent = message;
@@ -888,11 +929,12 @@
                 `;
             } else {
                 const wasActive = license.status === 'active'; // كان مفعَّلاً سابقاً وانتهت صلاحيته الآن
+                const wasRevoked = wasActive && _licenseRevokedRemote; // ألغت الإدارة الكود أو حُذف
                 box.innerHTML = `
                     <div class="flex items-center justify-between gap-2">
                         <span class="text-slate-600 font-semibold flex items-center gap-1.5">
                             <i data-lucide="${wasActive ? 'clock' : 'info'}" class="w-4 h-4"></i>
-                            ${wasActive ? 'انتهت صلاحية الاشتراك' : 'حساب مجاني'}
+                            ${wasRevoked ? 'أُلغي تفعيل حسابك' : (wasActive ? 'انتهت صلاحية الاشتراك' : 'حساب مجاني')}
                         </span>
                         <button type="button" onclick="openActivateCodeModal()" class="text-xs bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded-lg font-semibold shrink-0">
                             ${wasActive ? 'إعادة التفعيل' : 'تفعيل الحساب'}
@@ -1073,6 +1115,7 @@
         function translateAuthError(err) {
             const map = {
                 'auth/invalid-email': 'صيغة البريد الإلكتروني غير صحيحة',
+                'auth/missing-email': 'يرجى إدخال البريد الإلكتروني',
                 'auth/user-not-found': 'لا يوجد حساب بهذا البريد الإلكتروني',
                 'auth/wrong-password': 'كلمة المرور غير صحيحة',
                 'auth/invalid-credential': 'البريد الإلكتروني أو كلمة المرور غير صحيحة',
@@ -1091,6 +1134,7 @@
             const errEl = document.getElementById('loginError');
             const btn = document.getElementById('loginSubmitBtn');
             errEl.textContent = '';
+            errEl.classList.remove('text-emerald-600'); errEl.classList.add('text-rose-600');
             btn.disabled = true; btn.textContent = 'جارٍ التحقق...';
             try {
                 await auth.signInWithEmailAndPassword(email, password);
@@ -1099,6 +1143,25 @@
                 errEl.textContent = translateAuthError(err);
             }
             btn.disabled = false; btn.textContent = 'تسجيل الدخول';
+        }
+
+        // إعادة تعيين كلمة المرور بالبريد (يتطلب إنترنت). الرسالة لا تكشف إن كان البريد مسجَّلاً أم لا
+        async function handleForgotPassword() {
+            const email = document.getElementById('loginEmail').value.trim();
+            const errEl = document.getElementById('loginError');
+            errEl.classList.remove('text-emerald-600'); errEl.classList.add('text-rose-600');
+            if (!email) {
+                errEl.textContent = 'اكتب بريدك الإلكتروني في الحقل أعلاه أولاً ثم اضغط «نسيت كلمة المرور؟».';
+                return;
+            }
+            errEl.textContent = 'جارٍ إرسال رابط إعادة التعيين...';
+            try {
+                await auth.sendPasswordResetEmail(email);
+                errEl.classList.remove('text-rose-600'); errEl.classList.add('text-emerald-600');
+                errEl.textContent = 'إن كان هذا البريد مسجَّلاً لدينا فسيصلك رابط إعادة تعيين كلمة المرور خلال دقائق (تحقق من البريد المزعج أيضاً).';
+            } catch (err) {
+                errEl.textContent = translateAuthError(err);
+            }
         }
 
         // علم يمنع مستمع onAuthStateChanged من تشغيل التطبيق أثناء خطوات التسجيل الحرجة
@@ -1472,6 +1535,7 @@
             if (!user) {
                 currentUser = null;
                 studentProfile = null;
+                _licenseRevokedRemote = false; _licenseCheck = { code: null, at: 0 };
                 // إلغاء كل مستمعي Firestore الحيّين فوراً؛ وإلا يبقون يعملون في الخلفية
                 // بلا فائدة (ويفشلون بخطأ صلاحيات غير ضروري بعد زوال جلسة المصادقة)
                 _firestoreUnsubscribers.forEach(unsub => unsub());
@@ -1523,6 +1587,7 @@
                         studentProfile = snap.data();
                         updateProfileUI(studentProfile);
                         renderDashboard();
+                        verifyLicenseWithServer();
                     }
                 }, err => console.error('تعذر تحميل بيانات الطالب:', err))
             );
@@ -1945,6 +2010,11 @@
                 const casesRef = studentRef.collection('cases');
                 const reqsRef = studentRef.collection('requirements');
                 const appsRef = studentRef.collection('appointments');
+                // قواعد الأمان تقبل معرّفات المرضى/الحالات من [A-Za-z0-9_-] فقط؛ أي معرّف آخر في النسخة
+                // الاحتياطية يُستبدل بمعرّف جديد ويُحدَّث patientId في الحالات المرتبطة به
+                const SAFE_DOC_ID_RE = /^[A-Za-z0-9_-]+$/;
+                const isSafeDocId = (v) => typeof v === 'string' && SAFE_DOC_ID_RE.test(v);
+                const patientIdMap = {};
 
                 // إنشاء كل مريض + counters.patients += 1 في transaction واحدة. عند الوصول لحد
                 // النسخة المجانية (أو عدّاد غير صالح) يتوقف الاسترجاع بخطأ صريح دون تجاوز
@@ -1955,7 +2025,8 @@
                     // (Timestamp) بعد المرور بـ JSON.stringify/JSON.parse، وorderBy('createdAt')
                     // في مستمع المرضى يستبعد أي وثيقة بلا طابع وقت صالح - فتختفي من العرض تماماً
                     rest.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-                    const patientRef = patientsRef.doc(id || patientsRef.doc().id);
+                    const patientRef = patientsRef.doc(isSafeDocId(id) ? id : patientsRef.doc().id);
+                    if (id && patientRef.id !== id) patientIdMap[id] = patientRef.id;
                     const result = await createDocWithCounterTx(studentRef, patientRef, rest, 'patients', FREE_PATIENT_LIMIT, null);
                     if (result.status === 'limit') {
                         const e = new Error(`وصلت إلى حد النسخة المجانية (${FREE_PATIENT_LIMIT} مرضى) أثناء الاسترجاع. لم يُتجاوز الحد.`);
@@ -1974,7 +2045,8 @@
                 for (const c of (data.cases || [])) {
                     const { id, xrays, ...rest } = c;
                     rest.createdAt = firebase.firestore.FieldValue.serverTimestamp(); // نفس سبب إصلاح المرضى أعلاه
-                    const caseRef = casesRef.doc(id || casesRef.doc().id);
+                    if (rest.patientId && patientIdMap[rest.patientId]) rest.patientId = patientIdMap[rest.patientId];
+                    const caseRef = casesRef.doc(isSafeDocId(id) ? id : casesRef.doc().id);
                     const result = await createDocWithCounterTx(studentRef, caseRef, rest, 'cases', FREE_CASE_LIMIT, null);
                     if (result.status === 'limit') {
                         const e = new Error(`وصلت إلى حد النسخة المجانية (${FREE_CASE_LIMIT} حالات) أثناء الاسترجاع. لم يُتجاوز الحد.`);
@@ -2007,6 +2079,7 @@
                     // قواعد الأمان تشترط createdAt == request.time (serverTimestamp): لا يمكن الاحتفاظ بتاريخ
                     // الإنشاء الأصلي للموعد (لا حقل مسموح لتخزينه)، وهو غير مستخدم في عرض المواعيد أو ترتيبها
                     rest.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                    if (rest.patientId && patientIdMap[rest.patientId]) rest.patientId = patientIdMap[rest.patientId];
                     ops.push(batchSetOp(appsRef.doc(id || appsRef.doc().id), rest));
                 }
                 await commitOpsInChunks(ops);
