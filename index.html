@@ -59,11 +59,11 @@
             <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-3">
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">البريد الإلكتروني</label>
-                    <input type="email" id="loginEmail" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                    <input type="email" id="loginEmail" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500" autocomplete="username">
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">كلمة المرور</label>
-                    <input type="password" id="loginPassword" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                    <input type="password" id="loginPassword" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500" autocomplete="current-password">
                 </div>
                 <div class="text-end -mt-1"><button type="button" onclick="handleForgotPassword()" class="text-xs text-teal-600 font-semibold hover:underline">نسيت كلمة المرور؟</button></div>
                 <p id="loginError" class="text-xs text-rose-600 min-h-[16px]"></p>
@@ -75,11 +75,11 @@
             <form id="signupForm" onsubmit="handleSignup(event)" class="space-y-3 hidden">
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">البريد الإلكتروني *</label>
-                    <input type="email" id="suEmail" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                    <input type="email" id="suEmail" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500" autocomplete="email">
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">كلمة المرور * (6 أحرف على الأقل)</label>
-                    <input type="password" id="suPassword" required minlength="6" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                    <input type="password" id="suPassword" required minlength="6" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500" autocomplete="new-password">
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">اسم الطالب الكامل *</label>
@@ -704,7 +704,7 @@
                 <p class="text-xs text-rose-600 leading-6">سيُحذف حسابك وكل بياناته (المرضى، الحالات، الصور الشعاعية، المتطلبات، المواعيد) نهائياً بلا أي إمكانية للاستعادة. أدخل كلمة مرورك لتأكيد هويتك والمتابعة.</p>
             </div>
             <form id="deleteAccountForm" onsubmit="handleDeleteAccountSubmit(event)" class="space-y-3">
-                <input type="password" id="deleteAccountPassword" required placeholder="كلمة المرور الحالية" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-500">
+                <input type="password" id="deleteAccountPassword" required placeholder="كلمة المرور الحالية" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-500" autocomplete="current-password">
                 <p id="deleteAccountError" class="text-xs text-rose-600 min-h-[16px]"></p>
                 <div class="flex gap-2">
                     <button type="button" onclick="closeDeleteAccountModal()" class="flex-1 px-4 py-2 border rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-50">إلغاء</button>
@@ -807,6 +807,21 @@
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#39;');
+        }
+
+        // ---- مساعدات أمان العرض (بيانات النسخ الاحتياطية المستعادة قد تحمل قيماً غير متوقعة) ----
+        // عدد صحيح غير سالب للعرض فقط: أي قيمة غير رقمية (نص يحوي HTML مثلاً) تصير 0
+        function safeCount(v) {
+            const n = Math.floor(Number(v));
+            return (Number.isFinite(n) && n > 0) ? Math.min(n, 1000000) : 0;
+        }
+        // معرّفات الوثائق المقبولة (تطابق شرط قواعد الأمان على معرّفات المرضى والحالات)
+        const SAFE_DOC_ID_RE = /^[A-Za-z0-9_-]+$/;
+        function isSafeDocId(v) { return typeof v === 'string' && SAFE_DOC_ID_RE.test(v); }
+        // الصور الشعاعية: data URL لصورة فقط (لا نص حرّ يصل إلى سمة src)
+        const SAFE_IMAGE_DATA_RE = /^data:image\/(?:jpeg|png|webp|gif);base64,[A-Za-z0-9+\/]+={0,2}$/;
+        function safeImageSrc(v) {
+            return (typeof v === 'string' && v.length <= 1200000 && SAFE_IMAGE_DATA_RE.test(v)) ? v : '';
         }
 
         // ============================================================
@@ -966,7 +981,12 @@
             btn.disabled = true;
             btn.textContent = 'جارٍ التحقق...';
 
-            const result = await activateLicenseCode(input.value);
+            let result;
+            try {
+                result = await activateLicenseCode(input.value);
+            } catch (err) {
+                result = { success: false, message: 'تعذر التفعيل: ' + (err && err.message ? err.message : err) };
+            }
 
             btn.disabled = false;
             btn.textContent = 'تفعيل';
@@ -989,6 +1009,9 @@
         async function activateLicenseCode(rawCode) {
             const code = (rawCode || '').trim().toUpperCase();
             if (!code) return { success: false, message: 'أدخل الكود أولاً.' };
+            // الكود يصير معرّف وثيقة: أي محرف خارج [A-Z0-9_-] (مثل «/») كان يرمي استثناءً قبل try ويترك زر التفعيل معطَّلاً
+            if (!/^[A-Z0-9_-]{1,64}$/.test(code)) return { success: false, message: 'كود غير صحيح.' };
+            if (!navigator.onLine) return { success: false, message: 'التفعيل يتطلب اتصالاً بالإنترنت. تحقق من اتصالك وحاول مجدداً.' };
 
             const uid = currentUser.uid;
             const deviceId = getDeviceId();
@@ -1577,6 +1600,7 @@
                 // بلا فائدة (ويفشلون بخطأ صلاحيات غير ضروري بعد زوال جلسة المصادقة)
                 _firestoreUnsubscribers.forEach(unsub => unsub());
                 _firestoreUnsubscribers = [];
+                clearSessionState();
                 showAuthScreen();
                 return;
             }
@@ -1592,6 +1616,20 @@
         let requirementsCache = [];
         let appointmentsCache = [];
         let _firestoreUnsubscribers = [];
+
+        // يمسح كل بيانات المستخدم السابق من الذاكرة ومن الواجهة عند تسجيل الخروج، كي لا يراها مستخدم
+        // آخر يسجّل الدخول على الجهاز نفسه (بقيت القوائم المرسومة في الصفحة المخفية بعد الخروج)
+        function clearSessionState() {
+            patientsCache = []; casesCache = []; requirementsCache = []; appointmentsCache = [];
+            currentXRayEntries = []; pendingXRayDeletions = [];
+            _pendingNewPatientId = null; _pendingNewCaseId = null;
+            ['patientForm', 'caseForm', 'appointmentForm'].forEach(id => { const f = document.getElementById(id); if (f && f.reset) f.reset(); });
+            ['closePatientModal', 'closeCaseModal', 'closeAppointmentModal', 'closeAddRequirementModal', 'closeActivateCodeModal', 'closeUpgradeModal', 'closeOnboardingModal', 'closeDeleteAccountModal', 'closeConfirmModal', 'closeXrayLightbox']
+                .forEach(fn => { try { if (typeof window[fn] === 'function') window[fn](); } catch (_) { /* لا يوقف التنظيف */ } });
+            [renderPatients, renderCases, renderRequirements, renderSchedule, renderHomeTodayAppointments, renderDashboard]
+                .forEach(fn => { try { fn(); } catch (_) { /* لا يوقف التنظيف */ } });
+            try { updateProfileUI({}); } catch (_) { /* لا يوقف التنظيف */ }
+        }
 
         function initApp() {
             lucide.createIcons();
@@ -1759,20 +1797,27 @@
                 }));
 
                 const backupData = {
-                    profile: studentProfile || null,
+                    // بيانات الملف الشخصي فقط: دون البريد ولا حالة الترخيص ولا العدّادات (الملف قد يُشارَك)
+                    profile: studentProfile ? {
+                        name: studentProfile.name || '', university: studentProfile.university || '',
+                        year: studentProfile.year || '', phone: studentProfile.phone || ''
+                    } : null,
                     patients: patientsCache,
                     cases: casesWithXrays,
                     requirements: requirementsCache,
                     appointments: appointmentsCache,
                     exportDate: new Date().toISOString()
                 };
-                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
+                // Blob بدل data: URL: الروابط الطويلة (نسخ فيها صور كثيرة) تفشل في المتصفحات
+                const blob = new Blob([JSON.stringify(backupData)], { type: 'application/json' });
+                const blobUrl = URL.createObjectURL(blob);
                 const downloadAnchor = document.createElement('a');
-                downloadAnchor.setAttribute("href", dataStr);
+                downloadAnchor.setAttribute("href", blobUrl);
                 downloadAnchor.setAttribute("download", `dentra_backup_${new Date().toISOString().slice(0,10)}.json`);
                 document.body.appendChild(downloadAnchor);
                 downloadAnchor.click();
                 downloadAnchor.remove();
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
             } catch (err) {
                 alert('تعذر إنشاء النسخة الاحتياطية، تحقق من اتصالك بالإنترنت: ' + err.message);
             }
@@ -1781,6 +1826,11 @@
         function importDataBackup(event) {
             const file = event.target.files[0];
             if (!file) return;
+            if (file.size > 200 * 1024 * 1024) {
+                alert('ملف النسخة الاحتياطية كبير جداً (أكثر من 200 ميغابايت).');
+                event.target.value = '';
+                return;
+            }
             const reader = new FileReader();
             reader.onload = function(e) {
                 let data;
@@ -1790,8 +1840,8 @@
                     alert('خطأ في قراءة ملف JSON');
                     return;
                 }
-                if (!data.patients || !data.cases) {
-                    alert('ملف النسخة الاحتياطية غير صالحة!');
+                if (!data || typeof data !== 'object' || Array.isArray(data) || !data.patients || !data.cases) {
+                    alert('ملف النسخة الاحتياطية غير صالح!');
                     return;
                 }
                 showConfirmDialog('سيستبدل هذا كل بياناتك الحالية (المرضى، الحالات، المتطلبات، المواعيد) بمحتوى النسخة الاحتياطية المختارة. هل تريد المتابعة؟', () => {
@@ -1973,7 +2023,57 @@
         // لذلك نتحقق منها الآن ونرفض قبل الحذف مع رسالة واضحة. (لا تُعدَّل أي بيانات هنا.)
         // تنبيه صيانة: القوائم أدناه يجب أن تبقى مطابقة لـ firestore.rules (create) لكل مجموعة.
         // createdAt لا يأتي من النسخة (يُكتب بـ serverTimestamp) فيُضاف إلى القائمتين مسبقاً.
+        // يتحقق من أنواع القيم وسلامتها قبل أي كتابة أو حذف: قواعد الأمان تفحص أسماء الحقول فقط، وملف النسخة
+        // الاحتياطية قد يأتي من مصدر غير موثوق (يُعرض لاحقاً في الواجهة)، فنرفض أي قيمة غير متوقعة بدل تخزينها
+        function assertBackupValuesSafe(data) {
+            const bad = [];
+            const MAX_TEXT = 20000;
+            const isStr = (v) => typeof v === 'string' && v.length <= MAX_TEXT;
+            const isCount = (v) => typeof v === 'number' && Number.isFinite(v) && Number.isInteger(v) && v >= 0 && v <= 1000000;
+            const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+            const note = (label, i, what) => { if (bad.length < 3) bad.push(`${label} [${i + 1}]: ${what}`); };
+            const listOf = (v, label) => {
+                if (v === undefined || v === null) return [];
+                if (!Array.isArray(v)) { bad.push(`${label}: ليست قائمة`); return []; }
+                return v;
+            };
+            const TEXT_CASE = ['title', 'patientId', 'patientName', 'subject', 'tooth', 'status', 'complaint', 'diagnosis', 'plan', 'procedure', 'materials', 'complications', 'startDate', 'endDate', 'followUp', 'notes'];
+            listOf(data.patients, 'المرضى').forEach((p, i) => {
+                if (!isObj(p)) return note('المرضى', i, 'سجل غير صالح');
+                if (!isStr(p.name) || !isStr(p.phone) || !isStr(p.subject)) note('المرضى', i, 'نص غير صالح (name/phone/subject)');
+                if (!(isStr(p.age) || (typeof p.age === 'number' && Number.isFinite(p.age)))) note('المرضى', i, 'age غير صالح');
+                if (!isObj(p.odontogram)) note('المرضى', i, 'odontogram غير صالح');
+                if (p.id !== undefined && typeof p.id !== 'string') note('المرضى', i, 'معرّف غير صالح');
+            });
+            listOf(data.cases, 'الحالات').forEach((c, i) => {
+                if (!isObj(c)) return note('الحالات', i, 'سجل غير صالح');
+                TEXT_CASE.forEach(k => { if (!isStr(c[k])) note('الحالات', i, `${k} ليس نصاً صالحاً`); });
+                if (c.followUpAppointmentId !== undefined && !isStr(c.followUpAppointmentId)) note('الحالات', i, 'followUpAppointmentId غير صالح');
+                if (c.id !== undefined && typeof c.id !== 'string') note('الحالات', i, 'معرّف غير صالح');
+                if (c.xrays !== undefined) {
+                    if (!Array.isArray(c.xrays) || c.xrays.length > 200) note('الحالات', i, 'قائمة الصور غير صالحة');
+                    else c.xrays.forEach((x, j) => { if (!safeImageSrc(x)) note('الحالات', i, `الصورة ${j + 1} ليست صورة صالحة`); });
+                }
+            });
+            listOf(data.requirements, 'المتطلبات').forEach((r, i) => {
+                if (!isObj(r)) return note('المتطلبات', i, 'سجل غير صالح');
+                if (!isStr(r.subject) || r.subject.length > 200) note('المتطلبات', i, 'subject غير صالح');
+                if (!isCount(r.goal) || !isCount(r.completed)) note('المتطلبات', i, 'goal/completed ليسا عددين صحيحين غير سالبين');
+                if (r.id !== undefined && typeof r.id !== 'string') note('المتطلبات', i, 'معرّف غير صالح');
+            });
+            listOf(data.appointments, 'المواعيد').forEach((a, i) => {
+                if (!isObj(a)) return note('المواعيد', i, 'سجل غير صالح');
+                ['patientId', 'patientName', 'date', 'time', 'notes'].forEach(k => { if (!isStr(a[k])) note('المواعيد', i, `${k} ليس نصاً صالحاً`); });
+                if (a.id !== undefined && typeof a.id !== 'string') note('المواعيد', i, 'معرّف غير صالح');
+            });
+            if (data.profile !== undefined && data.profile !== null && !isObj(data.profile)) bad.push('الملف الشخصي غير صالح');
+            if (bad.length) {
+                throw new Error('ملف النسخة الاحتياطية يحوي قيماً غير صالحة أو غير آمنة، ولذلك لن يتم الاسترجاع. أمثلة: ' + bad.join(' | ') + '. لم يُحذف أي شيء.');
+            }
+        }
+
         function assertBackupMatchesRules(data) {
+            assertBackupValuesSafe(data);
             const SHAPES = {
                 'المرضى': { list: data.patients, required: ['name', 'age', 'phone', 'subject', 'odontogram', 'createdAt'], extra: [], skip: [] },
                 'الحالات': {
@@ -2028,11 +2128,12 @@
 
                 if (data.profile) {
                     stage = 'تحديث بيانات الملف الشخصي';
+                    const profText = (v) => (typeof v === 'string' ? v : '').slice(0, 200);
                     await studentRef.set({
-                        name: data.profile.name || '',
-                        university: data.profile.university || '',
-                        year: data.profile.year || '',
-                        phone: data.profile.phone || ''
+                        name: profText(data.profile.name),
+                        university: profText(data.profile.university),
+                        year: profText(data.profile.year),
+                        phone: profText(data.profile.phone)
                     }, { merge: true });
                 }
 
@@ -2052,9 +2153,10 @@
                 const appsRef = studentRef.collection('appointments');
                 // قواعد الأمان تقبل معرّفات المرضى/الحالات من [A-Za-z0-9_-] فقط؛ أي معرّف آخر في النسخة
                 // الاحتياطية يُستبدل بمعرّف جديد ويُحدَّث patientId في الحالات المرتبطة به
-                const SAFE_DOC_ID_RE = /^[A-Za-z0-9_-]+$/;
-                const isSafeDocId = (v) => typeof v === 'string' && SAFE_DOC_ID_RE.test(v);
                 const patientIdMap = {};
+                // المواعيد: أي معرّف غير آمن يُستبدل مسبقاً (قبل إنشاء الحالات) كي يتبعه followUpAppointmentId
+                const appointmentIdMap = {};
+                (data.appointments || []).forEach(a => { if (a.id && !isSafeDocId(a.id)) appointmentIdMap[a.id] = appsRef.doc().id; });
 
                 // إنشاء كل مريض + counters.patients += 1 في transaction واحدة. عند الوصول لحد
                 // النسخة المجانية (أو عدّاد غير صالح) يتوقف الاسترجاع بخطأ صريح دون تجاوز
@@ -2086,6 +2188,7 @@
                     const { id, xrays, ...rest } = c;
                     rest.createdAt = firebase.firestore.FieldValue.serverTimestamp(); // نفس سبب إصلاح المرضى أعلاه
                     if (rest.patientId && patientIdMap[rest.patientId]) rest.patientId = patientIdMap[rest.patientId];
+                    if (rest.followUpAppointmentId && appointmentIdMap[rest.followUpAppointmentId]) rest.followUpAppointmentId = appointmentIdMap[rest.followUpAppointmentId];
                     const caseRef = casesRef.doc(isSafeDocId(id) ? id : casesRef.doc().id);
                     const result = await createDocWithCounterTx(studentRef, caseRef, rest, 'cases', FREE_CASE_LIMIT, null);
                     if (result.status === 'limit') {
@@ -2112,7 +2215,7 @@
                 const ops = [];
                 for (const r of (data.requirements || [])) {
                     const { id, ...rest } = r;
-                    ops.push(batchSetOp(reqsRef.doc(id || reqsRef.doc().id), rest));
+                    ops.push(batchSetOp(reqsRef.doc(isSafeDocId(id) ? id : reqsRef.doc().id), rest));
                 }
                 for (const a of (data.appointments || [])) {
                     const { id, ...rest } = a;
@@ -2120,7 +2223,7 @@
                     // الإنشاء الأصلي للموعد (لا حقل مسموح لتخزينه)، وهو غير مستخدم في عرض المواعيد أو ترتيبها
                     rest.createdAt = firebase.firestore.FieldValue.serverTimestamp();
                     if (rest.patientId && patientIdMap[rest.patientId]) rest.patientId = patientIdMap[rest.patientId];
-                    ops.push(batchSetOp(appsRef.doc(id || appsRef.doc().id), rest));
+                    ops.push(batchSetOp(appsRef.doc(appointmentIdMap[id] || (isSafeDocId(id) ? id : appsRef.doc().id)), rest));
                 }
                 await commitOpsInChunks(ops);
                 alert('تم استرجاع البيانات بنجاح!');
@@ -2283,10 +2386,10 @@
                         <p class="text-xs text-teal-700 font-semibold bg-teal-50 px-2 py-1 rounded w-fit">${escapeHtml(p.subject)}</p>
                     </div>
                     <div class="flex gap-2 pt-2 border-t border-slate-100">
-                        <button onclick="openOdontogram('${p.id}')" class="flex-1 bg-teal-50 hover:bg-teal-100 text-teal-700 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 border border-teal-200">
+                        <button onclick="openOdontogram(this.dataset.id)" data-id="${escapeHtml(p.id)}" class="flex-1 bg-teal-50 hover:bg-teal-100 text-teal-700 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 border border-teal-200">
                             <i data-lucide="file-text" class="w-3.5 h-3.5"></i> مخطط الأسنان
                         </button>
-                        <button onclick="deletePatient('${p.id}')" class="text-rose-500 hover:text-rose-700 p-1.5 border border-rose-100 rounded-lg">
+                        <button onclick="deletePatient(this.dataset.id)" data-id="${escapeHtml(p.id)}" class="text-rose-500 hover:text-rose-700 p-1.5 border border-rose-100 rounded-lg">
                             <i data-lucide="trash-2" class="w-4 h-4"></i>
                         </button>
                     </div>
@@ -2564,8 +2667,8 @@
                         ${c.diagnosis ? `<p class="text-xs text-slate-600 bg-slate-50 p-2 rounded mt-2"><strong>التشخيص:</strong> ${escapeHtml(c.diagnosis)}</p>` : ''}
                     </div>
                     <div class="flex gap-2 pt-2 border-t border-slate-100 justify-end">
-                        <button onclick="editCase('${c.id}')" class="text-xs font-semibold text-teal-600 hover:text-teal-800 border border-teal-200 bg-teal-50 px-3 py-1 rounded-lg">تعديل / تفاصيل</button>
-                        <button onclick="deleteCase('${c.id}')" class="text-xs font-semibold text-rose-600 hover:text-rose-800 border border-rose-200 bg-rose-50 px-2 py-1 rounded-lg"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                        <button onclick="editCase(this.dataset.id)" data-id="${escapeHtml(c.id)}" class="text-xs font-semibold text-teal-600 hover:text-teal-800 border border-teal-200 bg-teal-50 px-3 py-1 rounded-lg">تعديل / تفاصيل</button>
+                        <button onclick="deleteCase(this.dataset.id)" data-id="${escapeHtml(c.id)}" class="text-xs font-semibold text-rose-600 hover:text-rose-800 border border-rose-200 bg-rose-50 px-2 py-1 rounded-lg"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
                     </div>
                 `;
                 list.appendChild(card);
@@ -2580,7 +2683,7 @@
             const previouslySelected = select.value;
             select.innerHTML = '<option value="">اختر المريض...</option>';
             patients.forEach(p => {
-                select.innerHTML += `<option value="${p.id}" data-subject="${escapeHtml(p.subject)}" data-name="${escapeHtml(p.name)}">${escapeHtml(p.name)} (${escapeHtml(p.subject)})</option>`;
+                select.innerHTML += `<option value="${escapeHtml(p.id)}" data-subject="${escapeHtml(p.subject)}" data-name="${escapeHtml(p.name)}">${escapeHtml(p.name)} (${escapeHtml(p.subject)})</option>`;
             });
             // الحفاظ على اختيار المريض الحالي إن كانت نافذة الحالة مفتوحة أثناء تحديث القائمة
             if (previouslySelected) select.value = previouslySelected;
@@ -2738,17 +2841,27 @@
                 };
                 img.onload = function() {
                     const canvas = document.createElement('canvas');
-                    let width = img.width, height = img.height;
-                    const MAX_WIDTH = 1000;
-                    if (width > MAX_WIDTH) {
-                        height = Math.round(height * (MAX_WIDTH / width));
-                        width = MAX_WIDTH;
-                    }
-                    canvas.width = width;
-                    canvas.height = height;
                     const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-                    callback(canvas.toDataURL('image/jpeg', 0.6));
+                    // المحاولة الأولى كما كانت دائماً (عرض أقصى 1000 وجودة 0.6)؛ لا نخفّض الجودة إلا إن تجاوز
+                    // الحجم حد الوثيقة الآمن (صور شديدة الطول مثلاً): تُجرَّب إعدادات أخفّ بالتدريج
+                    const MAX_DATAURL_CHARS = 700000;
+                    const ATTEMPTS = [[1000, 0.6], [900, 0.5], [800, 0.4], [640, 0.35]];
+                    for (const [maxWidth, quality] of ATTEMPTS) {
+                        let width = img.width, height = img.height;
+                        if (width > maxWidth) {
+                            height = Math.round(height * (maxWidth / width));
+                            width = maxWidth;
+                        }
+                        canvas.width = Math.max(1, width);
+                        canvas.height = Math.max(1, height);
+                        ctx.fillStyle = '#ffffff'; // خلفية بيضاء لصور PNG الشفافة (JPEG لا يدعم الشفافية)
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        const url = canvas.toDataURL('image/jpeg', quality);
+                        if (url.length <= MAX_DATAURL_CHARS) { callback(url); return; }
+                    }
+                    console.error('تعذر تصغير الصورة إلى حجم آمن:', file && file.name);
+                    callback(null);
                 };
                 img.src = evt.target.result;
             };
@@ -2761,8 +2874,11 @@
             currentXRayEntries.forEach((entry, idx) => {
                 const wrapper = document.createElement('div');
                 wrapper.className = 'relative shrink-0 group';
+                const imgSrc = safeImageSrc(entry.data);
                 wrapper.innerHTML = `
-                    <img src="${entry.data}" class="w-16 h-16 object-cover rounded border border-slate-200 cursor-pointer hover:opacity-90" onclick="openXrayLightbox('${idx}')">
+                    ${imgSrc
+                        ? `<img src="${imgSrc}" class="w-16 h-16 object-cover rounded border border-slate-200 cursor-pointer hover:opacity-90" onclick="openXrayLightbox(${idx})">`
+                        : '<div class="w-16 h-16 rounded border border-slate-200 bg-slate-100 text-[10px] text-slate-400 flex items-center justify-center text-center">صورة غير صالحة</div>'}
                     <button type="button" onclick="removeXray(${idx})" title="حذف الصورة" class="absolute -top-1.5 -right-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-5 h-5 flex items-center justify-center text-[11px] shadow">✕</button>
                 `;
                 container.appendChild(wrapper);
@@ -2772,8 +2888,9 @@
         // تكبير صورة شعاعية معينة من المعاينة (يقبل الرقم التسلسلي idx بصيغة نصية أو رقمية)
         function openXrayLightbox(idx) {
             const entry = currentXRayEntries[idx];
-            if (!entry) return;
-            document.getElementById('xrayLightboxImg').src = entry.data;
+            const src = entry ? safeImageSrc(entry.data) : '';
+            if (!src) return;
+            document.getElementById('xrayLightboxImg').src = src;
             const lightbox = document.getElementById('xrayLightbox');
             lightbox.classList.remove('hidden');
             lightbox.classList.add('flex');
@@ -3053,8 +3170,9 @@
             }
 
             reqs.forEach((r, idx) => {
-                const percent = r.goal > 0 ? Math.min(100, Math.round((r.completed / r.goal) * 100)) : 0;
-                const atGoal = (r.completed || 0) >= (r.goal || 0); // لا يُسمح بتجاوز الهدف
+                const goalN = safeCount(r.goal), doneN = safeCount(r.completed);
+                const percent = goalN > 0 ? Math.min(100, Math.round((doneN / goalN) * 100)) : 0;
+                const atGoal = doneN >= goalN; // لا يُسمح بتجاوز الهدف
                 const card = document.createElement('div');
                 card.className = 'bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3';
                 card.innerHTML = `
@@ -3062,7 +3180,7 @@
                         <h3 class="font-bold text-slate-800 text-sm">${escapeHtml(r.subject)}</h3>
                         <div class="flex items-center gap-1.5">
                             <span class="text-xs font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded">${percent}%</span>
-                            <button onclick="deleteRequirement('${r.id}', '${escapeHtml(r.subject)}', ${r.completed || 0})" title="حذف المادة" class="text-rose-400 hover:text-rose-600">
+                            <button onclick="deleteRequirement(this.dataset.id, this.dataset.subject, Number(this.dataset.done))" data-id="${escapeHtml(r.id)}" data-subject="${escapeHtml(r.subject)}" data-done="${doneN}" title="حذف المادة" class="text-rose-400 hover:text-rose-600">
                                 <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                             </button>
                         </div>
@@ -3072,12 +3190,12 @@
                     </div>
                     <div class="flex justify-between items-center text-xs text-slate-600 pt-1">
                         <span class="flex items-center gap-1.5">
-                            المنجز: <strong class="text-slate-800">${r.completed}</strong> /
-                            <input type="number" min="0" value="${r.goal}" onchange="updateReqGoal(${idx}, this.value)" class="w-14 border border-slate-200 rounded px-1.5 py-0.5 text-xs text-center focus:outline-none focus:ring-2 focus:ring-teal-500" title="الهدف المطلوب">
+                            المنجز: <strong class="text-slate-800">${doneN}</strong> /
+                            <input type="number" min="0" value="${goalN}" onchange="updateReqGoal(${idx}, this.value)" class="w-14 border border-slate-200 rounded px-1.5 py-0.5 text-xs text-center focus:outline-none focus:ring-2 focus:ring-teal-500" title="الهدف المطلوب">
                         </span>
                         <div class="flex gap-1">
                             <button onclick="updateReqCount(${idx}, 1)" ${atGoal ? 'disabled title="وصلت إلى الهدف المحدد"' : ''} class="bg-teal-600 text-white w-6 h-6 rounded flex items-center justify-center font-bold text-sm ${atGoal ? 'opacity-40 cursor-not-allowed' : ''}">+</button>
-                            <button onclick="updateReqCount(${idx}, -1)" ${(r.completed || 0) <= 0 ? 'disabled' : ''} class="bg-slate-200 text-slate-700 w-6 h-6 rounded flex items-center justify-center font-bold text-sm ${(r.completed || 0) <= 0 ? 'opacity-40 cursor-not-allowed' : ''}">-</button>
+                            <button onclick="updateReqCount(${idx}, -1)" ${doneN <= 0 ? 'disabled' : ''} class="bg-slate-200 text-slate-700 w-6 h-6 rounded flex items-center justify-center font-bold text-sm ${doneN <= 0 ? 'opacity-40 cursor-not-allowed' : ''}">-</button>
                         </div>
                     </div>
                 `;
@@ -3097,7 +3215,7 @@
                 listEl.innerHTML = '<p class="text-center text-slate-400 text-sm py-6">تمت إضافة كل المواد المتاحة بالفعل.</p>';
             } else {
                 listEl.innerHTML = available.map(subject => `
-                    <button onclick="addRequirement('${escapeHtml(subject)}')" class="w-full text-right px-4 py-3 border border-slate-200 rounded-lg hover:bg-teal-50 hover:border-teal-300 text-sm font-semibold text-slate-700 flex items-center justify-between">
+                    <button onclick="addRequirement(this.dataset.subject)" data-subject="${escapeHtml(subject)}" class="w-full text-right px-4 py-3 border border-slate-200 rounded-lg hover:bg-teal-50 hover:border-teal-300 text-sm font-semibold text-slate-700 flex items-center justify-between">
                         ${escapeHtml(subject)}
                         <i data-lucide="plus-circle" class="w-4 h-4 text-teal-600"></i>
                     </button>
@@ -3216,7 +3334,7 @@
                                 <p class="font-bold text-slate-800 text-sm">${escapeHtml(a.patientName)}</p>
                                 <p class="text-slate-500">${escapeHtml(a.date)} عند الساعة ${escapeHtml(a.time)} ${a.notes ? `(${escapeHtml(a.notes)})` : ''}</p>
                             </div>
-                            <button onclick="deleteAppointment('${a.id}')" class="text-rose-500 hover:text-rose-700"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                            <button onclick="deleteAppointment(this.dataset.id)" data-id="${escapeHtml(a.id)}" class="text-rose-500 hover:text-rose-700"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                         </div>
                     `;
                 });
@@ -3233,7 +3351,7 @@
             const select = document.getElementById('appPatientSelect');
             select.innerHTML = '<option value="">اختر المريض...</option>';
             patients.forEach(p => {
-                select.innerHTML += `<option value="${p.id}" data-name="${escapeHtml(p.name)}">${escapeHtml(p.name)}</option>`;
+                select.innerHTML += `<option value="${escapeHtml(p.id)}" data-name="${escapeHtml(p.name)}">${escapeHtml(p.name)}</option>`;
             });
 
             document.getElementById('appointmentForm').reset();
