@@ -83,7 +83,7 @@
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">اسم الطالب الكامل *</label>
-                    <input type="text" id="suName" required placeholder="د. أحمد علي" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                    <input type="text" id="suName" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">الجامعة *</label>
@@ -386,8 +386,26 @@
                     <i data-lucide="printer" class="w-4 h-4"></i> طباعة التقرير (PDF)
                 </button>
             </div>
+            <!-- اختيار نوع الأسنان عند الدخول (دائمة / لبنية) ثم يظهر المخطط -->
+            <div id="dentitionPicker" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4 no-print">
+                <h3 class="text-sm font-bold text-slate-700 text-center">اختر نوع الأسنان</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button type="button" onclick="chooseDentition('permanent')" class="border-2 border-slate-200 hover:border-teal-500 hover:bg-teal-50 rounded-xl p-5 text-center space-y-1">
+                        <span class="block text-base font-bold text-slate-800">الأسنان الدائمة</span>
+                        <span class="block text-xs text-slate-500">Permanent teeth &middot; 32 سناً</span>
+                    </button>
+                    <button type="button" onclick="chooseDentition('primary')" class="border-2 border-slate-200 hover:border-teal-500 hover:bg-teal-50 rounded-xl p-5 text-center space-y-1">
+                        <span class="block text-base font-bold text-slate-800">الأسنان اللبنية</span>
+                        <span class="block text-xs text-slate-500">Primary teeth &middot; 20 سناً</span>
+                    </button>
+                </div>
+            </div>
+            <div id="odontogramChart" class="hidden space-y-6">
             <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3 no-print">
-                <span class="text-xs font-bold text-slate-500 block">حدد الحالة ثم انقر على سطح السن لتطبيقه:</span>
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-xs font-bold text-slate-500 block">حدد الحالة ثم انقر على سطح السن لتطبيقه:</span>
+                    <button type="button" onclick="showDentitionPicker()" class="text-xs border px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-50 font-semibold">تغيير نوع الأسنان</button>
+                </div>
                 <div class="flex flex-wrap gap-3 text-sm">
                     <label class="flex items-center gap-2 cursor-pointer border px-3 py-1.5 rounded-lg hover:bg-slate-50"><input type="radio" name="toolStatus" value="caries" checked class="accent-red-500"><span class="w-3 h-3 rounded-full bg-red-500 inline-block"></span> نخر / تسوس</label>
                     <label class="flex items-center gap-2 cursor-pointer border px-3 py-1.5 rounded-lg hover:bg-slate-50"><input type="radio" name="toolStatus" value="filled" class="accent-blue-500"><span class="w-3 h-3 rounded-full bg-blue-500 inline-block"></span> معالج / حشوة</label>
@@ -407,7 +425,10 @@
                     <div class="flex justify-center gap-2 min-w-[700px]" id="lowerArchContainer"></div>
                 </div>
             </div>
+            </div>
         </section>
+
+        <p id="appVersionLabel" class="no-print text-center text-[10px] text-slate-300 pt-6"></p>
 
     </main>
 
@@ -418,7 +439,7 @@
             <form id="onboardingForm" onsubmit="saveProfileData(event)" class="space-y-3">
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">اسم الطالب الكامل *</label>
-                    <input type="text" id="onbName" required placeholder="د. أحمد علي" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
+                    <input type="text" id="onbName" required class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500">
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">الجامعة *</label>
@@ -809,6 +830,12 @@
                 .replace(/'/g, '&#39;');
         }
 
+        const APP_VERSION = '1.0.1';
+        (function showAppVersion() {
+            const el = document.getElementById('appVersionLabel');
+            if (el) el.textContent = 'DENTRA · الإصدار ' + APP_VERSION;
+        })();
+
         // ---- مساعدات أمان العرض (بيانات النسخ الاحتياطية المستعادة قد تحمل قيماً غير متوقعة) ----
         // عدد صحيح غير سالب للعرض فقط: أي قيمة غير رقمية (نص يحوي HTML مثلاً) تصير 0
         function safeCount(v) {
@@ -963,6 +990,8 @@
         function openActivateCodeModal() {
             document.getElementById('activateCodeForm').reset();
             document.getElementById('activateCodeError').textContent = '';
+            const submitBtn = document.getElementById('activateCodeSubmitBtn');
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'تفعيل'; } // لا تبقى حالة «جارٍ التحقق» من محاولة سابقة
             document.getElementById('activateCodeModal').classList.remove('hidden');
             document.getElementById('activateCodeModal').classList.add('flex');
         }
@@ -983,7 +1012,14 @@
 
             let result;
             try {
-                result = await activateLicenseCode(input.value);
+                // مهلة 30 ثانية: دون اتصال حقيقي قد لا يعود الطلب أبداً فيبقى الزر معلَّقاً
+                result = await Promise.race([
+                    activateLicenseCode(input.value),
+                    new Promise(resolve => setTimeout(() => resolve({
+                        success: false,
+                        message: 'انتهت مهلة الاتصال. تحقق من اتصالك بالإنترنت؛ وإن كان التفعيل قد اكتمل فستظهر حالة حسابك المحدَّثة عند عودة الاتصال.'
+                    }), 30000))
+                ]);
             } catch (err) {
                 result = { success: false, message: 'تعذر التفعيل: ' + (err && err.message ? err.message : err) };
             }
@@ -2043,6 +2079,14 @@
                 if (!isStr(p.name) || !isStr(p.phone) || !isStr(p.subject)) note('المرضى', i, 'نص غير صالح (name/phone/subject)');
                 if (!(isStr(p.age) || (typeof p.age === 'number' && Number.isFinite(p.age)))) note('المرضى', i, 'age غير صالح');
                 if (!isObj(p.odontogram)) note('المرضى', i, 'odontogram غير صالح');
+                else {
+                    // مفاتيح الأسنان (دائمة 11-48 / لبنية 51-85) وأسطحها وألوانها بالصيغة التي يكتبها التطبيق نفسه
+                    // التحقق متساهل مع القيم (نص قصير بلا علامات HTML) كي لا تُرفض نسخ قديمة؛ أما العرض فيطبّق الألوان الصالحة فقط
+                    const badChart = Object.keys(p.odontogram).some(t => !ODONTOGRAM_TOOTH_RE.test(t) || !isObj(p.odontogram[t]) ||
+                        Object.keys(p.odontogram[t]).some(sf => !ODONTOGRAM_SURFACE_RE.test(sf) || typeof p.odontogram[t][sf] !== 'string' ||
+                            p.odontogram[t][sf].length > 40 || /[<>"'`]/.test(p.odontogram[t][sf])));
+                    if (badChart) note('المرضى', i, 'odontogram يحوي سناً أو سطحاً أو لوناً غير صالح');
+                }
                 if (p.id !== undefined && typeof p.id !== 'string') note('المرضى', i, 'معرّف غير صالح');
             });
             listOf(data.cases, 'الحالات').forEach((c, i) => {
@@ -3423,9 +3467,9 @@
 
             document.getElementById('activePatientName').textContent = p.name;
             document.getElementById('activePatientMeta').textContent = `العمر: ${p.age} سنة | المادة: ${p.subject}`;
-            
+
             switchTab('odontogram');
-            loadPatientOdontogram(p);
+            showDentitionPicker(); // يختار المستخدم نوع الأسنان أولاً ثم يظهر المخطط
         }
 
         function handlePrintClick() {
@@ -3433,21 +3477,71 @@
                 showUpgradeModal('طباعة التقرير بصيغة PDF متاحة فقط بعد تفعيل الحساب.');
                 return;
             }
+            if (!currentDentition) {
+                alert('اختر نوع الأسنان أولاً ليظهر المخطط ثم اطبع.');
+                return;
+            }
             window.print();
         }
 
-        function renderUpperArch() {
-            const teeth = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
+        // أنواع الأسنان وترقيمها (FDI): الدائمة 11-48، واللبنية 51-85 (خمسة أسنان في كل ربع)
+        const DENTITIONS = {
+            permanent: {
+                label: 'الدائمة',
+                upper: [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28],
+                lower: [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38],
+                minWidth: 'min-w-[700px]'
+            },
+            primary: {
+                label: 'اللبنية',
+                upper: [55, 54, 53, 52, 51, 61, 62, 63, 64, 65],
+                lower: [85, 84, 83, 82, 81, 71, 72, 73, 74, 75],
+                minWidth: 'min-w-[460px]'
+            }
+        };
+        let currentDentition = null; // لا مخطط معروض حتى يختار المستخدم النوع عند الدخول
+
+        // مفاتيح وقيم مخطط الأسنان المقبولة عند العرض (تطابق ما يكتبه التطبيق نفسه)
+        const ODONTOGRAM_TOOTH_RE = /^(?:[1-4][1-8]|[5-8][1-5])$/;
+        const ODONTOGRAM_SURFACE_RE = /^[A-Za-z]{1,8}$/;
+        const ODONTOGRAM_COLOR_RE = /^#[0-9a-fA-F]{3,8}$/;
+
+        function renderUpperArch(kind) {
+            const d = DENTITIONS[kind] || DENTITIONS.permanent;
             const container = document.getElementById('upperArchContainer');
             container.innerHTML = '';
-            teeth.forEach(num => container.appendChild(createToothSVG(num)));
+            container.classList.remove('min-w-[700px]', 'min-w-[460px]'); container.classList.add(d.minWidth);
+            d.upper.forEach(num => container.appendChild(createToothSVG(num)));
         }
 
-        function renderLowerArch() {
-            const teeth = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
+        function renderLowerArch(kind) {
+            const d = DENTITIONS[kind] || DENTITIONS.permanent;
             const container = document.getElementById('lowerArchContainer');
             container.innerHTML = '';
-            teeth.forEach(num => container.appendChild(createToothSVG(num)));
+            container.classList.remove('min-w-[700px]', 'min-w-[460px]'); container.classList.add(d.minWidth);
+            d.lower.forEach(num => container.appendChild(createToothSVG(num)));
+        }
+
+        function showDentitionPicker() {
+            currentDentition = null;
+            document.getElementById('odontogramChart').classList.add('hidden');
+            document.getElementById('dentitionPicker').classList.remove('hidden');
+            const p = patientsCache.find(item => item.id === currentOdontogramPatientId);
+            if (p) document.getElementById('activePatientMeta').textContent = `العمر: ${p.age} سنة | المادة: ${p.subject}`;
+        }
+
+        function chooseDentition(kind) {
+            if (!DENTITIONS[kind] || !currentOdontogramPatientId) return;
+            const p = patientsCache.find(item => item.id === currentOdontogramPatientId);
+            if (!p) return;
+            currentDentition = kind;
+            renderUpperArch(kind);
+            renderLowerArch(kind);
+            loadPatientOdontogram(p);
+            document.getElementById('dentitionPicker').classList.add('hidden');
+            document.getElementById('odontogramChart').classList.remove('hidden');
+            // يظهر نوع الأسنان في رأس التقرير المطبوع أيضاً
+            document.getElementById('activePatientMeta').textContent = `العمر: ${p.age} سنة | المادة: ${p.subject} | الأسنان: ${DENTITIONS[kind].label}`;
         }
 
         function createToothSVG(toothNum) {
@@ -3505,18 +3599,17 @@
         }
 
         function loadPatientOdontogram(patient) {
-            // Reset colors first
-            document.querySelectorAll('polygon').forEach(poly => poly.setAttribute('fill', '#f8fafc'));
-
-            if (patient.odontogram) {
-                Object.keys(patient.odontogram).forEach(toothNum => {
-                    const toothSurfaces = patient.odontogram[toothNum];
-                    Object.keys(toothSurfaces).forEach(surface => {
-                        const poly = document.querySelector(`svg[data-tooth="${toothNum}"] polygon[data-surface="${surface}"]`);
-                        if (poly) poly.setAttribute('fill', toothSurfaces[surface]);
-                    });
+            // نمرّ على الأسنان المرسومة فعلاً بدل بناء محدِّد (selector) من بيانات مخزَّنة، ولا نطبّق إلا ألواناً صالحة
+            const chart = (patient && patient.odontogram && typeof patient.odontogram === 'object') ? patient.odontogram : {};
+            document.querySelectorAll('svg[data-tooth]').forEach(svg => {
+                const tooth = svg.getAttribute('data-tooth');
+                const surfaces = ODONTOGRAM_TOOTH_RE.test(tooth) && chart[tooth] && typeof chart[tooth] === 'object' ? chart[tooth] : {};
+                svg.querySelectorAll('polygon').forEach(poly => {
+                    const surface = poly.getAttribute('data-surface');
+                    const color = ODONTOGRAM_SURFACE_RE.test(surface) ? surfaces[surface] : null;
+                    poly.setAttribute('fill', (typeof color === 'string' && ODONTOGRAM_COLOR_RE.test(color)) ? color : '#f8fafc');
                 });
-            }
+            });
         }
 
         // HELPERS
