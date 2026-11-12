@@ -887,6 +887,8 @@
         const MAX_PDF_BYTES = 20 * 1024 * 1024;
         const UNIVERSITIES = ['جامعة دمشق', 'جامعة اللاذقية', 'جامعة حلب', 'جامعة حمص', 'جامعة طرطوس', 'جامعة حماة', 'جامعة إدلب', 'جامعة خاصة'];
         const YEARS = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة'];
+        const SEMESTERS = [{ value: 'first', label: 'الفصل الأول' }, { value: 'second', label: 'الفصل الثاني' }, { value: 'both', label: 'الفصلان (مقرر سنوي)' }];
+        const semesterLabel = (v) => (SEMESTERS.find(x => x.value === v) || SEMESTERS[2]).label;
         const LECTURE_TYPES = { theory: 'نظري', practical: 'عملي' };
 
         const CC = { owner: '', repo: '', branch: 'main', baseUrl: '', token: '' };
@@ -958,6 +960,10 @@
             if (!nameOk(owner) || !nameOk(repo)) { cfgMessage('اسم الحساب أو المستودع غير صالح (أحرف إنجليزية وأرقام و - _ . فقط).', 'err'); return false; }
             if (!/^[A-Za-z0-9._\/-]+$/.test(branch)) { cfgMessage('اسم الفرع غير صالح.', 'err'); return false; }
             if (!baseUrl) baseUrl = `https://${owner}.github.io/${repo}`;
+            // حماية: عنوان المستودع (github.com) ليس عنوان الموقع. نحوّله تلقائياً إلى عنوان Pages
+            const ghRepo = baseUrl.match(/^https:\/\/(?:www\.)?github\.com\/([^\/\s]+)\/([^\/\s]+?)(?:\.git)?(?:\/.*)?$/i);
+            if (ghRepo) baseUrl = `https://${ghRepo[1].toLowerCase()}.github.io/${ghRepo[2]}`;
+            if (/^https:\/\/(?:www\.)?github\.com(\/|$)/i.test(baseUrl)) { cfgMessage('هذا عنوان GitHub وليس عنوان الموقع. استخدم الشكل: https://اسم-الحساب.github.io/اسم-المستودع', 'err'); return false; }
             if (!/^https:\/\/[^\s]+$/.test(baseUrl)) { cfgMessage('رابط الاستضافة يجب أن يبدأ بـ https://', 'err'); return false; }
             if (!token) { cfgMessage('أدخل رمز الوصول (Token).', 'err'); return false; }
             CC.owner = owner; CC.repo = repo; CC.branch = branch; CC.baseUrl = baseUrl; CC.token = token;
@@ -1183,7 +1189,7 @@
                         <div class="space-y-0.5">
                             <div class="flex items-center gap-2 flex-wrap">
                                 <span class="font-bold text-slate-800">${escapeHtml(c.name)}</span>
-                                <span class="text-[11px] text-slate-500">${escapeHtml(c.university || '')} · السنة ${escapeHtml(c.year || '')}</span>
+                                <span class="text-[11px] text-slate-500">${escapeHtml(c.university || '')} · السنة ${escapeHtml(c.year || '')} · ${escapeHtml(semesterLabel(c.semester))}</span>
                                 ${c.hidden ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700">مخفي</span>' : ''}
                             </div>
                             <div class="text-[11px] text-slate-400">نظري: ${th} · عملي: ${pr}</div>
@@ -1297,7 +1303,8 @@
             return [
                 { id: 'name', label: 'اسم المقرر *', value: c ? c.name : '', required: true },
                 { id: 'university', label: 'الجامعة', type: 'select', options: opts(UNIVERSITIES), value: c ? c.university : 'جامعة اللاذقية' },
-                { id: 'year', label: 'السنة الدراسية', type: 'select', options: opts(YEARS), value: c ? c.year : 'الثالثة' }
+                { id: 'year', label: 'السنة الدراسية', type: 'select', options: opts(YEARS), value: c ? c.year : 'الثالثة' },
+                { id: 'semester', label: 'الفصل الدراسي', type: 'select', options: SEMESTERS, value: c ? (c.semester || 'both') : 'first' }
             ];
         }
         function courseAdd() {
@@ -1307,7 +1314,7 @@
                 onSubmit: async (v) => {
                     if (!v.name.trim()) throw new Error('أدخل اسم المقرر.');
                     await mutateIndex('إضافة مقرر: ' + v.name.trim(), () => {
-                        courseIndex.courses.push({ id: randomId('c_', 6), name: v.name.trim(), university: v.university, year: v.year, order: nextOrder(courseIndex.courses), hidden: false, lectures: [] });
+                        courseIndex.courses.push({ id: randomId('c_', 6), name: v.name.trim(), university: v.university, year: v.year, semester: v.semester, order: nextOrder(courseIndex.courses), hidden: false, lectures: [] });
                     });
                 }
             });
@@ -1318,7 +1325,7 @@
                 title: 'تعديل المقرر', fields: courseFields(c),
                 onSubmit: async (v) => {
                     if (!v.name.trim()) throw new Error('أدخل اسم المقرر.');
-                    await mutateIndex('تعديل مقرر: ' + v.name.trim(), () => { c.name = v.name.trim(); c.university = v.university; c.year = v.year; });
+                    await mutateIndex('تعديل مقرر: ' + v.name.trim(), () => { c.name = v.name.trim(); c.university = v.university; c.year = v.year; c.semester = v.semester; });
                 }
             });
         }
