@@ -9,11 +9,51 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style id="tailwind-compiled">*,:after,:before{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgba(59,130,246,.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }::backdrop{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgba(59,130,246,.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }/*! tailwindcss v3.4.17 | MIT License | https://tailwindcss.com*/*,:after,:before{box-sizing:border-box;border:0 solid #e5e7eb}:after,:before{--tw-content:""}:host,html{line-height:1.5;-webkit-text-size-adjust:100%;-moz-tab-size:4;-o-tab-size:4;tab-size:4;font-family:ui-sans-serif,system-ui,sans-serif,Apple Color Emoji,Segoe UI Emoji,Segoe UI Symbol,Noto Color Emoji;font-feature-settings:normal;font-variation-settings:normal;-webkit-tap-highlight-color:transparent}body{margin:0;line-height:inherit}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,pre,samp{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,Courier New,monospace;font-feature-settings:normal;font-variation-settings:normal;font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}button,input,optgroup,select,textarea{font-family:inherit;font-feature-settings:inherit;font-variation-settings:inherit;font-size:100%;font-weight:inherit;line-height:inherit;letter-spacing:inherit;color:inherit;margin:0;padding:0}button,select{text-transform:none}button,input:where([type=button]),input:where([type=reset]),input:where([type=submit]){-webkit-appearance:button;background-color:transparent;background-image:none}:-moz-focusring{outline:auto}:-moz-ui-invalid{box-shadow:none}progress{vertical-align:baseline}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}summary{display:list-item}blockquote,dd,dl,figure,h1,h2,h3,h4,h5,h6,hr,p,pre{margin:0}fieldset{margin:0}fieldset,legend{padding:0}menu,ol,ul{list-style:none;margin:0;padding:0}dialog{padding:0}textarea{resize:vertical}input::-moz-placeholder,textarea::-moz-placeholder{opacity:1;color:#9ca3af}input::placeholder,textarea::placeholder{opacity:1;color:#9ca3af}[role=button],button{cursor:pointer}:disabled{cursor:default}audio,canvas,embed,iframe,img,object,svg,video{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}[hidden]:where(:not([hidden=until-found])){display:none}.container{width:100%}@media (min-width:640px){.container{max-width:640px}}@media (min-width:768px){.container{max-width:768px}}@media (min-width:1024px){.container{max-width:1024px}}@media (min-width:1280px){.container{max-width:1280px}}@media (min-width:1536px){.container{max-width:1536px}}.fixed{position:fixed}.sticky{position:sticky}.inset-0{inset:0}.top-0{top:0}.z-40{z-index:40}.z-\[55\]{z-index:55}.z-\[60\]{z-index:60}.mx-auto{margin-left:auto;margin-right:auto}.mb-1{margin-bottom:.25rem}.mt-1{margin-top:.25rem}.mt-2{margin-top:.5rem}.mt-3{margin-top:.75rem}.mt-4{margin-top:1rem}.block{display:block}.flex{display:flex}.table{display:table}.grid{display:grid}.hidden{display:none}.h-12{height:3rem}.h-2{height:.5rem}.h-3{height:.75rem}.h-3\.5{height:.875rem}.h-4{height:1rem}.h-5{height:1.25rem}.h-6{height:1.5rem}.h-8{height:2rem}.max-h-\[60vh\]{max-height:60vh}.max-h-\[90vh\]{max-height:90vh}.min-h-\[16px\]{min-height:16px}.min-h-screen{min-height:100vh}.w-12{width:3rem}.w-3{width:.75rem}.w-3\.5{width:.875rem}.w-4{width:1rem}.w-5{width:1.25rem}.w-6{width:1.5rem}.w-8{width:2rem}.w-full{width:100%}.min-w-0{min-width:0}.max-w-5xl{max-width:64rem}.max-w-lg{max-width:32rem}.max-w-sm{max-width:24rem}.flex-1{flex:1 1 0%}.shrink-0{flex-shrink:0}.cursor-pointer{cursor:pointer}.select-none{-webkit-user-select:none;-moz-user-select:none;user-select:none}.grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}.flex-col{flex-direction:column}.flex-wrap{flex-wrap:wrap}.items-center{align-items:center}.justify-center{justify-content:center}.justify-between{justify-content:space-between}.gap-1{gap:.25rem}.gap-1\.5{gap:.375rem}.gap-2{gap:.5rem}.gap-3{gap:.75rem}.space-y-0\.5>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(.125rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(.125rem*var(--tw-space-y-reverse))}.space-y-1>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(.25rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(.25rem*var(--tw-space-y-reverse))}.space-y-2>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(.5rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(.5rem*var(--tw-space-y-reverse))}.space-y-3>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(.75rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(.75rem*var(--tw-space-y-reverse))}.space-y-4>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1rem*var(--tw-space-y-reverse))}.space-y-5>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1.25rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1.25rem*var(--tw-space-y-reverse))}.space-y-6>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1.5rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1.5rem*var(--tw-space-y-reverse))}.overflow-hidden{overflow:hidden}.overflow-y-auto{overflow-y:auto}.whitespace-pre-line{white-space:pre-line}.rounded{border-radius:.25rem}.rounded-full{border-radius:9999px}.rounded-lg{border-radius:.5rem}.rounded-xl{border-radius:.75rem}.rounded-t-lg{border-top-left-radius:.5rem;border-top-right-radius:.5rem}.border{border-width:1px}.border-b{border-bottom-width:1px}.border-b-2{border-bottom-width:2px}.border-t{border-top-width:1px}.border-amber-200{--tw-border-opacity:1;border-color:rgb(253 230 138/var(--tw-border-opacity,1))}.border-emerald-200{--tw-border-opacity:1;border-color:rgb(167 243 208/var(--tw-border-opacity,1))}.border-rose-200{--tw-border-opacity:1;border-color:rgb(254 205 211/var(--tw-border-opacity,1))}.border-slate-100{--tw-border-opacity:1;border-color:rgb(241 245 249/var(--tw-border-opacity,1))}.border-slate-200{--tw-border-opacity:1;border-color:rgb(226 232 240/var(--tw-border-opacity,1))}.border-slate-800{--tw-border-opacity:1;border-color:rgb(30 41 59/var(--tw-border-opacity,1))}.border-transparent{border-color:transparent}.border-white{--tw-border-opacity:1;border-color:rgb(255 255 255/var(--tw-border-opacity,1))}.border-white\/20{border-color:hsla(0,0%,100%,.2)}.bg-amber-100{--tw-bg-opacity:1;background-color:rgb(254 243 199/var(--tw-bg-opacity,1))}.bg-amber-50{--tw-bg-opacity:1;background-color:rgb(255 251 235/var(--tw-bg-opacity,1))}.bg-emerald-100{--tw-bg-opacity:1;background-color:rgb(209 250 229/var(--tw-bg-opacity,1))}.bg-emerald-50{--tw-bg-opacity:1;background-color:rgb(236 253 245/var(--tw-bg-opacity,1))}.bg-emerald-500{--tw-bg-opacity:1;background-color:rgb(16 185 129/var(--tw-bg-opacity,1))}.bg-rose-100{--tw-bg-opacity:1;background-color:rgb(255 228 230/var(--tw-bg-opacity,1))}.bg-rose-50{--tw-bg-opacity:1;background-color:rgb(255 241 242/var(--tw-bg-opacity,1))}.bg-sky-100{--tw-bg-opacity:1;background-color:rgb(224 242 254/var(--tw-bg-opacity,1))}.bg-slate-100{--tw-bg-opacity:1;background-color:rgb(241 245 249/var(--tw-bg-opacity,1))}.bg-slate-200{--tw-bg-opacity:1;background-color:rgb(226 232 240/var(--tw-bg-opacity,1))}.bg-slate-50{--tw-bg-opacity:1;background-color:rgb(248 250 252/var(--tw-bg-opacity,1))}.bg-slate-800{--tw-bg-opacity:1;background-color:rgb(30 41 59/var(--tw-bg-opacity,1))}.bg-slate-900{--tw-bg-opacity:1;background-color:rgb(15 23 42/var(--tw-bg-opacity,1))}.bg-slate-900\/50{background-color:rgba(15,23,42,.5)}.bg-violet-100{--tw-bg-opacity:1;background-color:rgb(237 233 254/var(--tw-bg-opacity,1))}.bg-white{--tw-bg-opacity:1;background-color:rgb(255 255 255/var(--tw-bg-opacity,1))}.bg-white\/10{background-color:hsla(0,0%,100%,.1)}.p-3{padding:.75rem}.p-4{padding:1rem}.p-5{padding:1.25rem}.p-6{padding:1.5rem}.px-2{padding-left:.5rem;padding-right:.5rem}.px-2\.5{padding-left:.625rem;padding-right:.625rem}.px-3{padding-left:.75rem;padding-right:.75rem}.px-4{padding-left:1rem;padding-right:1rem}.px-6{padding-left:1.5rem;padding-right:1.5rem}.py-0{padding-top:0;padding-bottom:0}.py-0\.5{padding-top:.125rem;padding-bottom:.125rem}.py-1{padding-top:.25rem;padding-bottom:.25rem}.py-1\.5{padding-top:.375rem;padding-bottom:.375rem}.py-2{padding-top:.5rem;padding-bottom:.5rem}.py-2\.5{padding-top:.625rem;padding-bottom:.625rem}.py-3{padding-top:.75rem;padding-bottom:.75rem}.py-4{padding-top:1rem;padding-bottom:1rem}.py-6{padding-top:1.5rem;padding-bottom:1.5rem}.pb-0{padding-bottom:0}.pb-4{padding-bottom:1rem}.pt-1{padding-top:.25rem}.pt-4{padding-top:1rem}.text-center{text-align:center}.font-mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,Courier New,monospace}.text-2xl{font-size:1.5rem;line-height:2rem}.text-\[10px\]{font-size:10px}.text-\[11px\]{font-size:11px}.text-lg{font-size:1.125rem;line-height:1.75rem}.text-sm{font-size:.875rem;line-height:1.25rem}.text-xl{font-size:1.25rem;line-height:1.75rem}.text-xs{font-size:.75rem;line-height:1rem}.font-bold{font-weight:700}.font-normal{font-weight:400}.font-semibold{font-weight:600}.leading-6{line-height:1.5rem}.text-amber-600{--tw-text-opacity:1;color:rgb(217 119 6/var(--tw-text-opacity,1))}.text-amber-700{--tw-text-opacity:1;color:rgb(180 83 9/var(--tw-text-opacity,1))}.text-emerald-600{--tw-text-opacity:1;color:rgb(5 150 105/var(--tw-text-opacity,1))}.text-emerald-700{--tw-text-opacity:1;color:rgb(4 120 87/var(--tw-text-opacity,1))}.text-rose-500{--tw-text-opacity:1;color:rgb(244 63 94/var(--tw-text-opacity,1))}.text-rose-600{--tw-text-opacity:1;color:rgb(225 29 72/var(--tw-text-opacity,1))}.text-sky-700{--tw-text-opacity:1;color:rgb(3 105 161/var(--tw-text-opacity,1))}.text-slate-400{--tw-text-opacity:1;color:rgb(148 163 184/var(--tw-text-opacity,1))}.text-slate-500{--tw-text-opacity:1;color:rgb(100 116 139/var(--tw-text-opacity,1))}.text-slate-600{--tw-text-opacity:1;color:rgb(71 85 105/var(--tw-text-opacity,1))}.text-slate-700{--tw-text-opacity:1;color:rgb(51 65 85/var(--tw-text-opacity,1))}.text-slate-800{--tw-text-opacity:1;color:rgb(30 41 59/var(--tw-text-opacity,1))}.text-violet-700{--tw-text-opacity:1;color:rgb(109 40 217/var(--tw-text-opacity,1))}.text-white{--tw-text-opacity:1;color:rgb(255 255 255/var(--tw-text-opacity,1))}.opacity-60{opacity:.6}.shadow{--tw-shadow:0 1px 3px 0 rgba(0,0,0,.1),0 1px 2px -1px rgba(0,0,0,.1);--tw-shadow-colored:0 1px 3px 0 var(--tw-shadow-color),0 1px 2px -1px var(--tw-shadow-color)}.shadow,.shadow-lg{box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.shadow-lg{--tw-shadow:0 10px 15px -3px rgba(0,0,0,.1),0 4px 6px -4px rgba(0,0,0,.1);--tw-shadow-colored:0 10px 15px -3px var(--tw-shadow-color),0 4px 6px -4px var(--tw-shadow-color)}.shadow-sm{--tw-shadow:0 1px 2px 0 rgba(0,0,0,.05);--tw-shadow-colored:0 1px 2px 0 var(--tw-shadow-color)}.shadow-sm,.shadow-xl{box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.shadow-xl{--tw-shadow:0 20px 25px -5px rgba(0,0,0,.1),0 8px 10px -6px rgba(0,0,0,.1);--tw-shadow-colored:0 20px 25px -5px var(--tw-shadow-color),0 8px 10px -6px var(--tw-shadow-color)}.filter{filter:var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)}.backdrop-blur-sm{--tw-backdrop-blur:blur(4px);-webkit-backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia);backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)}.transition-all{transition-property:all;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:.15s}.hover\:bg-amber-100:hover{--tw-bg-opacity:1;background-color:rgb(254 243 199/var(--tw-bg-opacity,1))}.hover\:bg-emerald-100:hover{--tw-bg-opacity:1;background-color:rgb(209 250 229/var(--tw-bg-opacity,1))}.hover\:bg-rose-100:hover{--tw-bg-opacity:1;background-color:rgb(255 228 230/var(--tw-bg-opacity,1))}.hover\:bg-slate-100:hover{--tw-bg-opacity:1;background-color:rgb(241 245 249/var(--tw-bg-opacity,1))}.hover\:bg-slate-200:hover{--tw-bg-opacity:1;background-color:rgb(226 232 240/var(--tw-bg-opacity,1))}.hover\:bg-slate-50:hover{--tw-bg-opacity:1;background-color:rgb(248 250 252/var(--tw-bg-opacity,1))}.hover\:bg-slate-900:hover{--tw-bg-opacity:1;background-color:rgb(15 23 42/var(--tw-bg-opacity,1))}.hover\:bg-white\/10:hover{background-color:hsla(0,0%,100%,.1)}.hover\:text-slate-800:hover{--tw-text-opacity:1;color:rgb(30 41 59/var(--tw-text-opacity,1))}.focus\:ring-2:focus{--tw-ring-offset-shadow:var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);--tw-ring-shadow:var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);box-shadow:var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow,0 0 #0000)}.focus\:ring-slate-500:focus{--tw-ring-opacity:1;--tw-ring-color:rgb(100 116 139/var(--tw-ring-opacity,1))}.disabled\:opacity-30:disabled{opacity:.3}@media (min-width:768px){.md\:col-span-3{grid-column:span 3/span 3}.md\:w-64{width:16rem}.md\:w-auto{width:auto}.md\:grid-cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}.md\:grid-cols-4{grid-template-columns:repeat(4,minmax(0,1fr))}.md\:flex-row{flex-direction:row}.md\:items-center{align-items:center}}</style>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap');
         body { font-family: 'Cairo', sans-serif; }
     </style>
+    <style id="dlp-style">
+/* معالج المحاضرات التفاعلية: أنماط مستقلة (الأنماط المصرّفة في الصفحة لا تتضمن هذه الأصناف) */
+#dlpWizard{position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(15,23,42,.6);z-index:58;display:none;overflow-y:auto;padding:8px}
+#dlpWizard.open{display:flex;justify-content:center;align-items:flex-start}
+.dlp-card{background:#fff;border-radius:12px;box-shadow:0 20px 40px rgba(0,0,0,.25);width:100%;max-width:760px;padding:16px;margin:8px 0;color:#1e293b}
+.dlp-h{font-weight:700;font-size:15px}
+.dlp-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.dlp-x{background:none;border:0;font-size:26px;line-height:1;color:#94a3b8;cursor:pointer}
+.dlp-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.dlp-lbl{display:block;font-size:12px;font-weight:600;color:#475569;margin:10px 0 4px}
+.dlp-in{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px;font-size:14px;background:#fff}
+.dlp-chk{display:flex;align-items:center;gap:8px;font-size:13px;color:#334155;margin-top:10px}
+.dlp-hint{font-size:11px;color:#94a3b8;margin-top:4px;line-height:1.6}
+.dlp-btn{border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:600;color:#334155;cursor:pointer}
+.dlp-btn.pri{background:#1e293b;color:#fff;border-color:#1e293b}
+.dlp-btn.ok{background:#059669;color:#fff;border-color:#059669}
+.dlp-btn:disabled{opacity:.45;cursor:default}
+.dlp-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.dlp-acts .grow{flex:1}
+.dlp-box{border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.8;margin-top:10px}
+.dlp-box ul{margin:4px 0 0;padding-right:18px}
+.dlp-err{background:#fff1f2;color:#be123c;border:1px solid #fecdd3}
+.dlp-warn{background:#fffbeb;color:#b45309;border:1px solid #fde68a}
+.dlp-good{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}
+.dlp-info{background:#f8fafc;color:#475569;border:1px solid #e2e8f0}
+.dlp-canvas{max-width:100%;height:auto;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;display:block;margin:8px auto}
+.dlp-edges{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.dlp-edge{border:1px solid #e2e8f0;border-radius:8px;padding:6px}
+.dlp-edge b{display:block;font-size:12px;color:#475569;margin-bottom:4px}
+.dlp-edge .g{display:flex;gap:6px}
+.dlp-edge .g button{flex:1;padding:11px 4px}
+.dlp-steps{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px}
+.dlp-steps button{padding:6px 10px}
+.dlp-steps button.on{background:#1e293b;color:#fff;border-color:#1e293b}
+.dlp-bar{height:8px;background:#f1f5f9;border-radius:99px;overflow:hidden;margin-top:10px}
+.dlp-bar i{display:block;height:8px;background:#10b981;width:0;transition:width .2s}
+.dlp-hidden{display:none!important}
+.dlp-tag{display:inline-block;font-size:10px;font-weight:700;padding:1px 8px;border-radius:6px;background:#1e293b;color:#fff;margin-inline-start:6px}
+</style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen">
 
@@ -312,6 +352,66 @@
         </div>
     </div>
 
+    </div>
+
+    <!-- معالج المحاضرات التفاعلية (DLP1) -->
+    <div id="dlpWizard" role="dialog" aria-modal="true" aria-label="محاضرة تفاعلية">
+        <div class="dlp-card">
+            <div class="dlp-top"><h3 id="dlpTitleBar" class="dlp-h">محاضرة تفاعلية</h3><button type="button" class="dlp-x" onclick="dlpClose()" aria-label="إغلاق">&times;</button></div>
+
+            <div id="dlpStep1">
+                <label class="dlp-lbl" for="dlpName">عنوان المحاضرة (يُملأ تلقائياً من الملف إن تُرك فارغاً)</label>
+                <input id="dlpName" class="dlp-in" type="text">
+                <div id="dlpMetaFields">
+                    <div class="dlp-row">
+                        <div><label class="dlp-lbl" for="dlpType">النوع</label><select id="dlpType" class="dlp-in"><option value="theory">نظري</option><option value="practical">عملي</option></select></div>
+                        <div></div>
+                    </div>
+                    <label class="dlp-chk"><input id="dlpFree" type="checkbox"> محاضرة مجانية (عينة مفتوحة للجميع)</label>
+                    <label class="dlp-chk"><input id="dlpHide" type="checkbox" checked> إخفاؤها عن الطلاب حتى يصدر تحديث التطبيق الذي يفتح الصيغة الجديدة</label>
+                </div>
+                <label class="dlp-lbl" for="dlpJson">ملف (أو ملفات أجزاء) JSON الناتجة من AI Studio</label>
+                <input id="dlpJson" class="dlp-in" type="file" multiple accept=".json,.txt,application/json,text/plain">
+                <p class="dlp-hint">إن اخترتَ عدة أجزاء فتُرتَّب تلقائياً حسب أرقام الصفحات وتُدمج.</p>
+                <label class="dlp-lbl" for="dlpPdf">ملف PDF الأصلي (لقص الأشكال)</label>
+                <input id="dlpPdf" class="dlp-in" type="file" accept="application/pdf,.pdf">
+                <div id="dlpReport"></div>
+                <p id="dlpError" class="dlp-box dlp-err dlp-hidden"></p>
+                <div class="dlp-acts"><button type="button" id="dlpAnalyzeBtn" class="dlp-btn pri grow" onclick="dlpAnalyze()">تحليل وتدقيق</button><button type="button" class="dlp-btn" onclick="dlpClose()">إلغاء</button></div>
+            </div>
+
+            <div id="dlpStep2" class="dlp-hidden">
+                <div id="dlpFigHead" style="font-size:13px;font-weight:700"></div>
+                <div id="dlpFigSub" class="dlp-hint"></div>
+                <canvas id="dlpCrop" class="dlp-canvas"></canvas>
+                <details style="margin-top:6px"><summary style="font-size:12px;color:#475569;cursor:pointer">عرض الصفحة كاملة مع موضع القص</summary><canvas id="dlpPageView" class="dlp-canvas" style="max-width:340px"></canvas></details>
+                <div class="dlp-steps"><span style="font-size:12px;color:#475569">خطوة التعديل:</span>
+                    <button type="button" class="dlp-btn" data-s="5" onclick="dlpSetStep(5)">0.5%</button>
+                    <button type="button" class="dlp-btn on" data-s="10" onclick="dlpSetStep(10)">1%</button>
+                    <button type="button" class="dlp-btn" data-s="25" onclick="dlpSetStep(25)">2.5%</button>
+                    <button type="button" class="dlp-btn" data-s="50" onclick="dlpSetStep(50)">5%</button></div>
+                <div class="dlp-edges">
+                    <div class="dlp-edge"><b>الحافة العليا</b><div class="g"><button type="button" class="dlp-btn" onclick="dlpNudge('t',1)">↑ توسيع</button><button type="button" class="dlp-btn" onclick="dlpNudge('t',-1)">↓ تضييق</button></div></div>
+                    <div class="dlp-edge"><b>الحافة السفلى</b><div class="g"><button type="button" class="dlp-btn" onclick="dlpNudge('b',1)">↓ توسيع</button><button type="button" class="dlp-btn" onclick="dlpNudge('b',-1)">↑ تضييق</button></div></div>
+                    <div class="dlp-edge"><b>الحافة اليسرى</b><div class="g"><button type="button" class="dlp-btn" onclick="dlpNudge('l',1)">← توسيع</button><button type="button" class="dlp-btn" onclick="dlpNudge('l',-1)">→ تضييق</button></div></div>
+                    <div class="dlp-edge"><b>الحافة اليمنى</b><div class="g"><button type="button" class="dlp-btn" onclick="dlpNudge('r',1)">→ توسيع</button><button type="button" class="dlp-btn" onclick="dlpNudge('r',-1)">← تضييق</button></div></div>
+                </div>
+                <div class="dlp-acts">
+                    <button type="button" class="dlp-btn" onclick="dlpGo(-1)">السابق</button>
+                    <button type="button" id="dlpApproveBtn" class="dlp-btn ok grow" onclick="dlpApprove()">اعتماد والتالي</button>
+                    <button type="button" class="dlp-btn" onclick="dlpGo(1)">التالي</button>
+                </div>
+                <div class="dlp-acts"><button type="button" class="dlp-btn" onclick="dlpShowStep(1)">رجوع</button><button type="button" id="dlpToUpload" class="dlp-btn pri grow" onclick="dlpToUpload()">متابعة إلى الرفع</button></div>
+                <p id="dlpReviewCount" class="dlp-hint"></p>
+            </div>
+
+            <div id="dlpStep3" class="dlp-hidden">
+                <p id="dlpUpText" class="dlp-hint" style="font-size:13px">جارٍ التحضير...</p>
+                <div class="dlp-bar"><i id="dlpUpBar"></i></div>
+                <p id="dlpUpError" class="dlp-box dlp-err dlp-hidden"></p>
+                <div class="dlp-acts"><button type="button" id="dlpUpBack" class="dlp-btn dlp-hidden" onclick="dlpShowStep(2)">رجوع للمراجعة</button></div>
+            </div>
+        </div>
     </div>
 
     <!-- MODERN CONFIRM DIALOG -->
@@ -1104,6 +1204,10 @@
             if (file.size > MAX_PDF_BYTES) throw new Error(`حجم الملف ${formatBytes(file.size)} يتجاوز الحد (${formatBytes(MAX_PDF_BYTES)}). اضغط الملف أولاً.`);
             const buf = new Uint8Array(await file.arrayBuffer());
             if (buf.length < 8 || String.fromCharCode(buf[0], buf[1], buf[2], buf[3], buf[4]) !== '%PDF-') throw new Error('الملف ليس PDF صالحاً.');
+            return encryptBytes(buf);
+        }
+        async function encryptBytes(buf) {
+            if (buf.length > MAX_PDF_BYTES) throw new Error(`حجم الملف ${formatBytes(buf.length)} يتجاوز الحد (${formatBytes(MAX_PDF_BYTES)}).`);
             const rawKey = crypto.getRandomValues(new Uint8Array(32));
             const key = await crypto.subtle.importKey('raw', rawKey, 'AES-GCM', false, ['encrypt']);
             const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -1148,12 +1252,12 @@
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-2 border border-slate-100 rounded-lg px-3 py-2 ${l.hidden ? 'opacity-60' : ''}">
                 <div class="space-y-0.5 min-w-0">
                     <div class="flex items-center gap-2 flex-wrap">
-                        <span class="text-sm font-semibold text-slate-800">${escapeHtml(l.title)}</span>
+                        <span class="text-sm font-semibold text-slate-800">${escapeHtml(l.title)}</span>${l.format === 'dlp' ? '<span class="dlp-tag">تفاعلية</span>' : ''}
                         <span class="px-2 py-0.5 rounded text-[10px] font-bold ${l.type === 'theory' ? 'bg-sky-100 text-sky-700' : 'bg-violet-100 text-violet-700'}">${LECTURE_TYPES[l.type] || l.type}</span>
                         ${lock}
                         ${l.hidden ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700">مخفية</span>' : ''}
                     </div>
-                    <div class="text-[11px] text-slate-400">${formatBytes(l.size)} · أُضيفت <span dir="ltr">${escapeHtml((l.addedAt || '').slice(0, 10))}</span>${l.rev > 1 ? ' · نسخة ' + l.rev : ''}</div>
+                    <div class="text-[11px] text-slate-400">${formatBytes(l.size)}${l.format === 'dlp' && l.meta ? ' · ' + (l.meta.figures || 0) + ' شكل · ' + (l.meta.quiz || 0) + ' سؤال' : ''} · أُضيفت <span dir="ltr">${escapeHtml((l.addedAt || '').slice(0, 10))}</span>${l.rev > 1 ? ' · نسخة ' + l.rev : ''}</div>
                 </div>
                 <div class="flex flex-wrap gap-1.5 shrink-0">
                     <button type="button" onclick="lectureToggleLock('${c.id}','${l.id}')" class="text-xs border px-2.5 py-1 rounded-lg hover:bg-slate-50 ${free ? 'text-slate-600' : 'text-emerald-700 border-emerald-200'}">${free ? 'قفل' : 'جعلها مجانية'}</button>
@@ -1196,6 +1300,7 @@
                         </div>
                         <div class="flex flex-wrap gap-1.5" onclick="event.stopPropagation()">
                             <button type="button" onclick="lectureAdd('${c.id}')" class="text-xs bg-slate-800 hover:bg-slate-900 text-white px-3 py-1.5 rounded-lg font-semibold">+ محاضرة</button>
+                            <button type="button" onclick="dlpOpen('${c.id}')" class="text-xs border px-3 py-1.5 rounded-lg font-semibold" style="border-color:#1e293b;color:#1e293b">+ تفاعلية</button>
                             <button type="button" onclick="courseMove('${c.id}',-1)" ${ci === 0 ? 'disabled' : ''} class="text-xs border px-2 py-1 rounded-lg hover:bg-slate-50 disabled:opacity-30">▲</button>
                             <button type="button" onclick="courseMove('${c.id}',1)" ${ci === courses.length - 1 ? 'disabled' : ''} class="text-xs border px-2 py-1 rounded-lg hover:bg-slate-50 disabled:opacity-30">▼</button>
                             <button type="button" onclick="courseEdit('${c.id}')" class="text-xs border px-2.5 py-1.5 rounded-lg hover:bg-slate-50 text-slate-600">تعديل</button>
@@ -1376,29 +1481,31 @@
         // التسلسل مقصود: المفتاح أولاً (يمكن التراجع عنه بسهولة) ثم الملف ثم الفهرس. الفهرس هو ما يجعل المحاضرة ظاهرة،
         // فأي فشل قبله لا يُظهر محاضرة ناقصة للطلاب، وننظّف ما أُنشئ.
         async function uploadLecture(c, p, replacing) {
-            modalProgress(5, 'جارٍ تشفير الملف...');
-            const enc = await encryptPdf(p.file);
+            const prog = p.onProgress || modalProgress;
+            prog(5, 'جارٍ تشفير الملف...');
+            const enc = p.prepared ? await encryptBytes(p.prepared.bytes) : await encryptPdf(p.file);
             const lectureId = replacing ? replacing.id : randomId('l_', 8);
             const rev = replacing ? (replacing.rev || 1) + 1 : 1;
             const keyId = rev === 1 ? lectureId : `${lectureId}_${rev}`;
             const path = `lectures/${c.id}/${keyId}.bin`;
             let keyWritten = false, fileUploaded = false;
             try {
-                modalProgress(25, 'جارٍ حفظ مفتاح الفك...');
+                prog(25, 'جارٍ حفظ مفتاح الفك...');
                 await putKey(keyId, enc.keyB64, replacing ? isFreeKey(replacing.keyId) : !!p.free);
                 keyWritten = true;
-                modalProgress(45, `جارٍ رفع الملف المشفَّر (${formatBytes(enc.bytes.length)})...`);
+                prog(45, `جارٍ رفع الملف المشفَّر (${formatBytes(enc.bytes.length)})...`);
                 await ghPutFile(path, bytesToB64(enc.bytes), (replacing ? 'استبدال' : 'إضافة') + ' محاضرة: ' + p.title);
                 fileUploaded = true;
-                modalProgress(85, 'جارٍ تحديث الفهرس...');
+                prog(85, 'جارٍ تحديث الفهرس...');
                 const old = replacing ? { keyId: replacing.keyId, path: replacing.path } : null;
                 await mutateIndex((replacing ? 'استبدال' : 'إضافة') + ' محاضرة: ' + p.title, () => {
                     c.lectures = c.lectures || [];
                     if (replacing) {
                         const l = findLecture(c, replacing.id);
                         l.keyId = keyId; l.path = path; l.rev = rev; l.size = enc.size;
+                        if (p.prepared) { l.format = 'dlp'; l.meta = p.prepared.meta; }
                     } else {
-                        c.lectures.push({ id: lectureId, title: p.title, type: p.type, order: nextOrder(c.lectures.filter(x => x.type === p.type)), size: enc.size, rev: 1, keyId, path, hidden: false, addedAt: new Date().toISOString() });
+                        c.lectures.push({ id: lectureId, title: p.title, type: p.type, order: nextOrder(c.lectures.filter(x => x.type === p.type)), size: enc.size, rev: 1, keyId, path, hidden: !!p.hidden, addedAt: new Date().toISOString(), ...(p.prepared ? { format: 'dlp', meta: p.prepared.meta } : {}) });
                     }
                 });
                 if (old) {
@@ -1406,7 +1513,7 @@
                     try { await deleteKeys([old.keyId]); } catch (_) { /* ignore */ }
                     try { const d = await ghListDir('lectures/' + c.id); const f = d.find(x => x.path === old.path); if (f) await ghDeleteFile(f.path, f.sha, 'حذف نسخة قديمة'); } catch (_) { /* ignore */ }
                 }
-                modalProgress(100, 'تم.');
+                prog(100, 'تم.');
             } catch (err) {
                 if (keyWritten) { try { await deleteKeys([keyId]); } catch (_) { /* ignore */ } }
                 if (fileUploaded) { try { const d = await ghListDir('lectures/' + c.id); const f = d.find(x => x.path === path); if (f) await ghDeleteFile(f.path, f.sha, 'تراجع عن رفع فاشل'); } catch (_) { /* ignore */ } }
@@ -1433,6 +1540,7 @@
         }
         function lectureReplace(courseId, lectureId) {
             const c = findCourse(courseId), l = c && findLecture(c, lectureId); if (!l) return;
+            if (l.format === 'dlp') { dlpOpen(courseId, lectureId); return; }
             courseModalOpen({
                 title: `استبدال ملف «${l.title}»`, submitText: 'تشفير واستبدال',
                 fields: [{ id: 'file', label: 'ملف PDF الجديد *', type: 'file', accept: 'application/pdf,.pdf', hint: 'يحتفظ بحالة القفل نفسها. يظهر الملف الجديد عند الطلاب فور فتحهم للقسم.' }],
@@ -1507,6 +1615,510 @@
                     renderCourses();
                 }
             });
+        }
+
+        // ---------- مكتبة حزمة المحاضرة (نسخة من lecture-package/*.mjs) ----------
+        const DlpLib = (() => {
+// تحليل JSON متسامح مع عيوب النسخ من الهاتف: أسطر مكسورة داخل النصوص، وأسوار ```json، وحواشٍ حول الكائن.
+function parseLenient(text) {
+  let s = String(text).replace(/^\uFEFF/, '').trim();
+  s = s.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+  const a = s.indexOf('{'), b = s.lastIndexOf('}');
+  if (a > 0 || (b >= 0 && b < s.length - 1)) s = s.slice(a, b + 1);
+  let out = '', inStr = false, esc = false;
+  for (const ch of s) {
+    if (inStr) {
+      if (esc) { out += ch; esc = false; continue; }
+      if (ch === '\\') { out += ch; esc = true; continue; }
+      if (ch === '"') { inStr = false; out += ch; continue; }
+      if (ch === '\n' || ch === '\r' || ch === '\t') { out += ' '; continue; }   // سطر مكسور داخل نص: يصبح مسافة
+      out += ch;
+    } else { if (ch === '"') inStr = true; out += ch; }
+  }
+  return JSON.parse(out);
+}
+
+// مدقّق حزمة المحاضرة (dentra.lecture/1). بلا اعتماديات، ويعمل في Node وفي المتصفح (لوحة التحكم لاحقاً).
+// يُرجع { errors, warnings, stats }. الأخطاء تمنع الرفع، والتحذيرات تُعرض للمراجعة فقط.
+
+const ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
+const LECTURE_ID_RE = /^[a-z0-9][a-z0-9_-]{2,63}$/;
+const BLOCK_TYPES = {
+  heading:   { req: ['level', 'text'], opt: ['page', 'origin'] },
+  paragraph: { req: ['text'], opt: ['page', 'origin'] },
+  list:      { req: ['items'], opt: ['ordered', 'start', 'page', 'origin'] },
+  table:     { req: ['rows'], opt: ['headers', 'page', 'origin'] },
+  figure:    { req: ['ref'], opt: ['page', 'origin'] },
+  callout:   { req: ['variant', 'text'], opt: ['title', 'page', 'origin'] },
+  formula:   { req: ['text'], opt: ['caption', 'page', 'origin'] },
+};
+const CALLOUT_VARIANTS = ['note', 'tip', 'warning', 'clinical', 'definition'];
+// أخطاء إملائية شائعة تُنبَّه إليها. يمكن تمرير قاموس إضافي عبر opts.suspiciousTerms
+const DEFAULT_SUSPICIOUS = { 'ضواحق': 'ضواحك', 'الضواحق': 'الضواحك' };
+
+
+// يحوّل ناتج AI Studio إلى الشكل المعياري: يزيل الحقول الفارغة ("" و[] و0) التي يفرضها المخطط المبسّط،
+// ويقصّ المعرّفات من الفراغات، ويحوّل صفوف الجداول {cells:[...]} إلى مصفوفات نصوص.
+const TRIM_KEYS = new Set(['id', 'ref', 'sectionRef']);
+function cleanNode(o, inRows = false) {
+  if (Array.isArray(o)) return o.map((x) => cleanNode(x, inRows));
+  if (o && typeof o === 'object') {
+    const r = {};
+    for (const [k, val] of Object.entries(o)) {
+      let x = val;
+      if (typeof x === 'string') { x = x.replace(/\s*\n\s*/g, ' ').trim(); if (TRIM_KEYS.has(k)) x = x.replace(/\s+/g, ''); }
+      if (x === '' || x === null || x === undefined || (Array.isArray(x) && x.length === 0 && k !== 'cells') || ((k === 'page' || k === 'level' || k === 'start') && x === 0)) continue;
+      r[k] = k === 'cells' ? x : cleanNode(x, k === 'rows');
+    }
+    return r;
+  }
+  return o;
+}
+function normalizeLecture(pkg) {
+  if (!pkg || typeof pkg !== 'object') return pkg;
+  const out = cleanNode(pkg);
+  if (Array.isArray(out.sections)) out.sections = out.sections.map((s) => (s && Array.isArray(s.blocks)
+    ? { ...s, blocks: s.blocks.map((b0) => {
+        if (!b0 || typeof b0 !== 'object') return b0;
+        const b = { ...b0 };
+        if (b.type === 'callout' && !b.variant) b.variant = 'note';
+        if (b.type !== 'list' && b.ordered === false) delete b.ordered;   // قيمة افتراضية يضيفها المخطط المبسّط
+        if (b.type === 'table' && Array.isArray(b.rows)) b.rows = b.rows.map((r) => (r && !Array.isArray(r) && Array.isArray(r.cells) ? r.cells : r));
+        return b;
+      }) }
+    : s));
+  return out;
+}
+
+function mergeParts(parts) {
+  // الجزء الأول يحمل lecture. بقية الأجزاء قد تحمل مصفوفات فقط. تُدمج بالترتيب.
+  const out = { schema: 'dentra.lecture/1', lecture: null, sections: [], figures: [], quiz: [], glossary: [], cases: [] };
+  for (const p of parts) {
+    if (!p || typeof p !== 'object') continue;
+    if (p.lecture && !out.lecture) out.lecture = p.lecture;
+    for (const k of ['sections', 'figures', 'quiz', 'glossary', 'cases']) if (Array.isArray(p[k])) out[k].push(...p[k]);
+  }
+  for (const k of ['figures', 'quiz', 'glossary', 'cases']) if (!out[k].length) delete out[k];
+  return normalizeLecture(out);
+}
+
+function validateLecturePackage(pkg, opts = {}) {
+  pkg = normalizeLecture(pkg);
+  const errors = [], warnings = [];
+  const err = (path, msg) => errors.push(`${path}: ${msg}`);
+  const warn = (path, msg) => warnings.push(`${path}: ${msg}`);
+  const suspicious = { ...DEFAULT_SUSPICIOUS, ...(opts.suspiciousTerms || {}) };
+  const isObj = (v) => v && typeof v === 'object' && !Array.isArray(v);
+  const checkKeys = (o, path, allowed) => { for (const k of Object.keys(o)) if (!allowed.includes(k)) err(path, `حقل غير معروف «${k}» (غير مسموح في المخطط)`); };
+
+  const checkText = (s, path, { max = 4000, allowEmpty = false } = {}) => {
+    if (typeof s !== 'string') { err(path, 'يجب أن يكون نصاً'); return; }
+    if (!allowEmpty && !s.trim()) { err(path, 'نص فارغ'); return; }
+    if (s.length > max) err(path, `النص أطول من الحد (${s.length} > ${max})`);
+    if (/<\s*\/?\s*[a-zA-Z!][^>]*>/.test(s)) err(path, 'يحتوي وسوم HTML وهي غير مسموحة');
+    if (/https?:\/\/|www\./i.test(s)) warn(path, 'يحتوي رابطاً وهو لن يُعرض كرابط');
+    if (/\*\*[^*]*$/.test(s.replace(/\*\*[^*]+\*\*/g, ''))) warn(path, 'علامة ** غير مغلقة');
+    if (/(\bTODO\b|lorem ipsum|\.\.\.\.\.|…{2,})/i.test(s)) warn(path, 'يبدو نصاً مؤقتاً أو غير مكتمل');
+    for (const [bad, good] of Object.entries(suspicious)) if (s.includes(bad)) warn(path, `كلمة مشبوهة «${bad}» (هل تقصد «${good}»؟)`);
+    // eslint-disable-next-line no-control-regex
+    if (/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(s)) err(path, 'يحتوي رموز تحكم غير مسموحة');
+  };
+
+  if (!isObj(pkg)) return { errors: ['الملف ليس كائن JSON صالحاً'], warnings, stats: {} };
+  checkKeys(pkg, 'الجذر', ['schema', 'lecture', 'sections', 'figures', 'quiz', 'glossary', 'cases']);
+  if (pkg.schema !== 'dentra.lecture/1') err('schema', 'يجب أن تكون القيمة "dentra.lecture/1"');
+
+  // lecture
+  const L = pkg.lecture; let sourcePages = null;
+  if (!isObj(L)) err('lecture', 'مفقود');
+  else {
+    checkKeys(L, 'lecture', ['id', 'titleAr', 'titleEn', 'summary', 'sourcePages', 'contentVersion']);
+    if (typeof L.id !== 'string' || !LECTURE_ID_RE.test(L.id)) err('lecture.id', 'معرّف غير صالح (أحرف إنجليزية صغيرة وأرقام و - و _ من 3 إلى 64)');
+    checkText(L.titleAr, 'lecture.titleAr', { max: 200 });
+    if (L.titleEn != null) checkText(L.titleEn, 'lecture.titleEn', { max: 200 });
+    if (L.summary != null) checkText(L.summary, 'lecture.summary', { max: 400 });
+    if (!Number.isInteger(L.sourcePages) || L.sourcePages < 1) err('lecture.sourcePages', 'عدد صفحات المصدر مطلوب (عدد صحيح)');
+    else sourcePages = L.sourcePages;
+  }
+  const pageOk = (p, path) => {
+    if (p == null) return;
+    if (!Number.isInteger(p) || p < 1) err(path, 'رقم صفحة غير صالح');
+    else if (sourcePages && p > sourcePages) err(path, `رقم الصفحة ${p} أكبر من عدد صفحات المصدر (${sourcePages})`);
+  };
+
+  const ids = new Map();   // id -> أين استُخدم، لكل فئة
+  const useId = (kind, id, path) => {
+    if (typeof id !== 'string' || !ID_RE.test(id)) { err(path, 'معرّف غير صالح (أحرف إنجليزية وأرقام و - و _ حتى 40)'); return; }
+    const key = kind + ':' + id;
+    if (ids.has(key)) err(path, `معرّف مكرر «${id}» (سبق في ${ids.get(key)})`); else ids.set(key, path);
+  };
+
+  // figures أولاً لأن الكتل تشير إليها
+  const figIds = new Set(); const refdFigs = new Set(); const pagesSeen = new Set();
+  if (pkg.figures != null) {
+    if (!Array.isArray(pkg.figures)) err('figures', 'يجب أن تكون مصفوفة');
+    else {
+      if (pkg.figures.length > 150) err('figures', 'عدد الأشكال أكبر من 150');
+      pkg.figures.forEach((f, i) => {
+        const p = `figures[${i}]`;
+        if (!isObj(f)) { err(p, 'ليس كائناً'); return; }
+        checkKeys(f, p, ['id', 'number', 'caption', 'captionEn', 'alt', 'page', 'box', 'keyPoints']);
+        useId('fig', f.id, p + '.id'); if (typeof f.id === 'string') figIds.add(f.id);
+        checkText(f.caption, p + '.caption', { max: 300 });
+        if (f.number != null) checkText(f.number, p + '.number', { max: 40 });
+        if (f.captionEn != null) checkText(f.captionEn, p + '.captionEn', { max: 300 });
+        if (f.alt != null) checkText(f.alt, p + '.alt', { max: 400 }); else warn(p, 'لا يوجد alt (وصف نصي للصورة)');
+        if (f.page == null) err(p + '.page', 'رقم الصفحة مطلوب'); else { pageOk(f.page, p + '.page'); pagesSeen.add(f.page); }
+        if (f.box != null) {
+          const b = f.box;
+          if (!Array.isArray(b) || b.length !== 4 || !b.every((n) => Number.isInteger(n) && n >= 0 && n <= 1000)) err(p + '.box', 'يجب أن يكون [ymin,xmin,ymax,xmax] أعداداً صحيحة بين 0 و1000');
+          else {
+            const [y0, x0, y1, x1] = b;
+            if (y1 - y0 < 20 || x1 - x0 < 20) err(p + '.box', 'المربع صغير جداً (أقل من 2% من الصفحة)');
+            if (y0 >= y1 || x0 >= x1) err(p + '.box', 'ترتيب الإحداثيات خاطئ: يجب ymin<ymax وxmin<xmax');
+          }
+        } else warn(p, 'لا يوجد box: سيُعرض الشكل كصفحة كاملة');
+        if (f.keyPoints != null) { if (!Array.isArray(f.keyPoints)) err(p + '.keyPoints', 'يجب أن تكون مصفوفة'); else f.keyPoints.forEach((k, j) => checkText(k, `${p}.keyPoints[${j}]`, { max: 300 })); }
+      });
+    }
+  }
+
+  // sections
+  const secIds = new Set(); let blockCount = 0, addedBlocks = 0;
+  if (!Array.isArray(pkg.sections) || !pkg.sections.length) err('sections', 'مطلوبة ويجب ألا تكون فارغة (هذا هو متن المحاضرة)');
+  else {
+    if (pkg.sections.length > 80) err('sections', 'عدد الأقسام أكبر من 80');
+    pkg.sections.forEach((s, i) => {
+      const p = `sections[${i}]`;
+      if (!isObj(s)) { err(p, 'ليس كائناً'); return; }
+      checkKeys(s, p, ['id', 'title', 'page', 'blocks']);
+      useId('sec', s.id, p + '.id'); if (typeof s.id === 'string') secIds.add(s.id);
+      checkText(s.title, p + '.title', { max: 200 });
+      if (s.page != null) { pageOk(s.page, p + '.page'); pagesSeen.add(s.page); }
+      if (!Array.isArray(s.blocks) || !s.blocks.length) { err(p + '.blocks', 'مطلوبة ولا تكون فارغة'); return; }
+      if (s.blocks.length > 300) err(p + '.blocks', 'عدد الكتل أكبر من 300');
+      s.blocks.forEach((b, j) => {
+        const bp = `${p}.blocks[${j}]`; blockCount++;
+        if (!isObj(b)) { err(bp, 'ليست كائناً'); return; }
+        const spec = BLOCK_TYPES[b.type];
+        if (!spec) { err(bp, `نوع كتلة غير معروف «${b.type}»`); return; }
+        checkKeys(b, bp, ['type', ...spec.req, ...spec.opt]);
+        for (const r of spec.req) if (b[r] == null) err(bp, `الحقل «${r}» مطلوب لكتلة ${b.type}`);
+        if (b.page != null) { pageOk(b.page, bp + '.page'); pagesSeen.add(b.page); }
+        if (b.origin != null && !['source', 'added'].includes(b.origin)) err(bp + '.origin', 'يجب أن تكون source أو added');
+        if (b.origin === 'added') addedBlocks++;
+        switch (b.type) {
+          case 'heading': if (![2, 3].includes(b.level)) err(bp + '.level', 'يجب أن يكون 2 أو 3'); checkText(b.text, bp + '.text', { max: 300 }); break;
+          case 'paragraph': checkText(b.text, bp + '.text'); break;
+          case 'list':
+            if (b.start != null && (!Number.isInteger(b.start) || b.start < 1)) err(bp + '.start', 'رقم بداية القائمة يجب أن يكون عدداً صحيحاً ≥ 1');
+            if (b.start != null && !b.ordered) warn(bp + '.start', 'start لا معنى له في قائمة غير مرقمة');
+            if (!Array.isArray(b.items) || !b.items.length) err(bp + '.items', 'مصفوفة غير فارغة مطلوبة');
+            else { if (b.items.length > 60) err(bp + '.items', 'أكثر من 60 عنصراً'); b.items.forEach((t, k) => checkText(t, `${bp}.items[${k}]`)); }
+            break;
+          case 'table': {
+            if (b.headers != null && !Array.isArray(b.headers)) err(bp + '.headers', 'يجب أن تكون مصفوفة');
+            if (!Array.isArray(b.rows) || !b.rows.length) { err(bp + '.rows', 'صفوف غير فارغة مطلوبة'); break; }
+            const w = (b.headers && b.headers.length) || b.rows[0].length;
+            b.rows.forEach((r, k) => {
+              if (!Array.isArray(r) || !r.length) err(`${bp}.rows[${k}]`, 'صف غير صالح');
+              else {
+                if (r.length !== w) warn(`${bp}.rows[${k}]`, `عدد الخلايا ${r.length} يخالف عدد الأعمدة ${w}`);
+                r.forEach((c, m) => checkText(c, `${bp}.rows[${k}][${m}]`, { max: 600, allowEmpty: true }));
+              }
+            });
+            break;
+          }
+          case 'figure':
+            if (typeof b.ref === 'string') { refdFigs.add(b.ref); if (!figIds.has(b.ref)) err(bp + '.ref', `الشكل «${b.ref}» غير موجود في figures`); }
+            break;
+          case 'callout':
+            if (!CALLOUT_VARIANTS.includes(b.variant)) err(bp + '.variant', `يجب أن تكون إحدى: ${CALLOUT_VARIANTS.join(', ')}`);
+            if (b.title != null) checkText(b.title, bp + '.title', { max: 120 });
+            checkText(b.text, bp + '.text'); break;
+          case 'formula': checkText(b.text, bp + '.text', { max: 300 }); if (b.caption != null) checkText(b.caption, bp + '.caption', { max: 200 }); break;
+        }
+      });
+    });
+  }
+  for (const f of figIds) if (!refdFigs.has(f)) warn(`figures[${f}]`, 'الشكل معرَّف لكنه غير مستخدم في أي كتلة figure داخل المتن');
+
+  // quiz
+  const answers = [];
+  if (pkg.quiz != null) {
+    if (!Array.isArray(pkg.quiz)) err('quiz', 'يجب أن تكون مصفوفة');
+    else pkg.quiz.forEach((q, i) => {
+      const p = `quiz[${i}]`;
+      if (!isObj(q)) { err(p, 'ليس كائناً'); return; }
+      checkKeys(q, p, ['id', 'question', 'options', 'answer', 'explanation', 'note', 'sectionRef', 'tags']);
+      useId('q', q.id, p + '.id'); checkText(q.question, p + '.question'); checkText(q.explanation, p + '.explanation');
+      if (q.note != null) checkText(q.note, p + '.note', { max: 600 });
+      if (!Array.isArray(q.options) || q.options.length < 2 || q.options.length > 6) err(p + '.options', 'من 2 إلى 6 خيارات');
+      else {
+        q.options.forEach((o, k) => checkText(o, `${p}.options[${k}]`, { max: 400 }));
+        if (new Set(q.options.map((o) => String(o).trim())).size !== q.options.length) err(p + '.options', 'خيارات مكررة');
+        if (!Number.isInteger(q.answer) || q.answer < 0 || q.answer >= q.options.length) err(p + '.answer', `الجواب يجب أن يكون فهرساً بين 0 و${q.options.length - 1}`);
+        else answers.push(q.answer);
+        const lens = q.options.map((o) => String(o).length), longest = lens.indexOf(Math.max(...lens));
+        if (Number.isInteger(q.answer) && longest === q.answer && Math.max(...lens) > 1.8 * (lens.reduce((a, b) => a + b, 0) - Math.max(...lens)) / Math.max(1, lens.length - 1)) warn(p, 'الجواب الصحيح أطول بكثير من بقية الخيارات (قد يكشف الجواب)');
+      }
+      if (q.sectionRef != null && !secIds.has(q.sectionRef)) err(p + '.sectionRef', `القسم «${q.sectionRef}» غير موجود`);
+    });
+    if (answers.length >= 5) {
+      const cnt = {}; answers.forEach((a) => { cnt[a] = (cnt[a] || 0) + 1; });
+      const [idx, n] = Object.entries(cnt).sort((a, b) => b[1] - a[1])[0];
+      if (n / answers.length > 0.5) warn('quiz', `${n} من ${answers.length} أسئلة جوابها الخيار رقم ${Number(idx) + 1}. توزيع غير متوازن (التطبيق يخلط الخيارات عند العرض على أي حال)`);
+    }
+  }
+
+  // glossary
+  if (pkg.glossary != null) {
+    if (!Array.isArray(pkg.glossary)) err('glossary', 'يجب أن تكون مصفوفة');
+    else {
+      const seen = new Set();
+      pkg.glossary.forEach((t, i) => {
+        const p = `glossary[${i}]`;
+        if (!isObj(t)) { err(p, 'ليس كائناً'); return; }
+        checkKeys(t, p, ['id', 'termAr', 'termEn', 'definition', 'note', 'tags']);
+        useId('term', t.id, p + '.id'); checkText(t.termAr, p + '.termAr', { max: 120 }); checkText(t.definition, p + '.definition');
+        if (t.termEn != null) checkText(t.termEn, p + '.termEn', { max: 120 });
+        if (t.note != null) checkText(t.note, p + '.note', { max: 600 });
+        const key = String(t.termAr || '').trim(); if (seen.has(key)) warn(p, `المصطلح «${key}» مكرر`); seen.add(key);
+      });
+    }
+  }
+
+  // cases
+  if (pkg.cases != null) {
+    if (!Array.isArray(pkg.cases)) err('cases', 'يجب أن تكون مصفوفة');
+    else pkg.cases.forEach((c, i) => {
+      const p = `cases[${i}]`;
+      if (!isObj(c)) { err(p, 'ليس كائناً'); return; }
+      checkKeys(c, p, ['id', 'title', 'intro', 'steps', 'takeaway', 'sectionRef']);
+      useId('case', c.id, p + '.id'); checkText(c.title, p + '.title', { max: 200 });
+      if (c.intro != null) checkText(c.intro, p + '.intro'); if (c.takeaway != null) checkText(c.takeaway, p + '.takeaway');
+      if (c.sectionRef != null && !secIds.has(c.sectionRef)) err(p + '.sectionRef', `القسم «${c.sectionRef}» غير موجود`);
+      if (!Array.isArray(c.steps) || !c.steps.length) { err(p + '.steps', 'خطوات مطلوبة'); return; }
+      const sids = new Set();
+      c.steps.forEach((s, j) => {
+        const sp = `${p}.steps[${j}]`;
+        if (!isObj(s)) { err(sp, 'ليس كائناً'); return; }
+        checkKeys(s, sp, ['id', 'prompt', 'options', 'explanation']);
+        if (typeof s.id !== 'string' || !ID_RE.test(s.id)) err(sp + '.id', 'معرّف غير صالح'); else if (sids.has(s.id)) err(sp + '.id', 'معرّف مكرر'); else sids.add(s.id);
+        checkText(s.prompt, sp + '.prompt'); if (s.explanation != null) checkText(s.explanation, sp + '.explanation');
+        if (!Array.isArray(s.options) || s.options.length < 2 || s.options.length > 6) { err(sp + '.options', 'من 2 إلى 6 خيارات'); return; }
+        let correct = 0;
+        s.options.forEach((o, k) => {
+          const op = `${sp}.options[${k}]`;
+          if (!isObj(o)) { err(op, 'ليس كائناً'); return; }
+          checkKeys(o, op, ['text', 'correct', 'feedback']);
+          checkText(o.text, op + '.text', { max: 400 }); checkText(o.feedback, op + '.feedback', { max: 600 });
+          if (typeof o.correct !== 'boolean') err(op + '.correct', 'يجب أن تكون true أو false'); else if (o.correct) correct++;
+        });
+        if (correct !== 1) err(sp + '.options', `يجب أن يكون هناك خيار صحيح واحد بالضبط (وُجد ${correct})`);
+      });
+    });
+  }
+
+  // تغطية الصفحات: تنبيه إلى صفحات المصدر التي لم يُشر إليها أي قسم أو كتلة أو شكل
+  if (sourcePages && pagesSeen.size) {
+    const missing = []; for (let p = 1; p <= sourcePages; p++) if (!pagesSeen.has(p)) missing.push(p);
+    if (missing.length) warn('sections', `صفحات من المصدر لا تشير إليها أي كتلة (قد يكون نصها ناقصاً): ${missing.join('، ')}`);
+  } else if (sourcePages && blockCount) warn('sections', 'لا توجد أي صفحة مذكورة في الكتل، فلا يمكن التحقق من اكتمال المتن مقابل المصدر');
+
+  const total = JSON.stringify(pkg).length;
+  if (total > 1_500_000) err('الحجم', `حجم JSON ${(total / 1e6).toFixed(2)} ميغابايت يتجاوز 1.5`);
+  const stats = { sections: pkg.sections?.length || 0, blocks: blockCount, addedBlocks, figures: pkg.figures?.length || 0, quiz: pkg.quiz?.length || 0, glossary: pkg.glossary?.length || 0, cases: pkg.cases?.length || 0, pagesCovered: pagesSeen.size, sourcePages, jsonKB: Math.round(total / 1024) };
+  return { errors, warnings, stats };
+}
+
+
+        return { parseLenient, normalizeLecture, mergeParts, validateLecturePackage };
+        })();
+
+        // ============================================================
+        // المحاضرات التفاعلية (حاوية DLP1): تحليل JSON وتدقيقه، مراجعة حدود الأشكال، التشفير والرفع
+        // ============================================================
+        const PDFJS_VER = '3.11.174';
+        const Dlp = { courseId: null, replacing: null, pkg: null, pdf: null, idx: 0, reviewed: new Set(), pages: new Map(), step: 10, token: 0, busy: false };
+        const dlpEl = (id) => document.getElementById(id);
+        const dlpSet = (id, text) => { const e = dlpEl(id); if (e) e.textContent = text; };
+        function dlpShowStep(n) { [1, 2, 3].forEach((i) => dlpEl('dlpStep' + i).classList.toggle('dlp-hidden', i !== n)); if (n === 2) dlpDraw(); }
+        function dlpOpen(courseId, replacingId) {
+            const c = findCourse(courseId); if (!c) return;
+            try { requireReady(); } catch (e) { alert(e.message); return; }
+            if (typeof pdfjsLib === 'undefined') { alert('تعذّر تحميل مكتبة قراءة PDF. تحقق من الاتصال وأعد تحميل الصفحة.'); return; }
+            pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VER}/pdf.worker.min.js`;
+            const rep = replacingId ? findLecture(c, replacingId) : null;
+            Object.assign(Dlp, { courseId, replacing: rep, pkg: null, pdf: null, idx: 0, reviewed: new Set(), busy: false });
+            Dlp.pages.clear();
+            dlpSet('dlpTitleBar', (rep ? 'استبدال محاضرة تفاعلية في «' : 'محاضرة تفاعلية جديدة في «') + c.name + '»');
+            dlpEl('dlpName').value = rep ? rep.title : '';
+            dlpEl('dlpMetaFields').classList.toggle('dlp-hidden', !!rep);   // عند الاستبدال تبقى حالة القفل والإخفاء كما هي
+            dlpEl('dlpType').value = 'theory'; dlpEl('dlpFree').checked = false; dlpEl('dlpHide').checked = true;
+            dlpEl('dlpJson').value = ''; dlpEl('dlpPdf').value = '';
+            dlpEl('dlpReport').innerHTML = ''; dlpEl('dlpError').classList.add('dlp-hidden');
+            dlpEl('dlpAnalyzeBtn').disabled = false;
+            dlpShowStep(1);
+            dlpEl('dlpWizard').classList.add('open');
+        }
+        function dlpClose() { if (Dlp.busy) return; dlpEl('dlpWizard').classList.remove('open'); Dlp.pdf = null; Dlp.pages.clear(); }
+        const dlpList = (arr, max) => '<ul>' + arr.slice(0, max).map((x) => `<li>${escapeHtml(x)}</li>`).join('') + (arr.length > max ? `<li>... و${arr.length - max} أخرى</li>` : '') + '</ul>';
+        const dlpMinPage = (o) => {
+            let m = Infinity; const take = (p) => { if (Number.isInteger(p) && p < m) m = p; };
+            (o.sections || []).forEach((s) => { take(s.page); (s.blocks || []).forEach((b) => take(b.page)); });
+            (o.figures || []).forEach((f) => take(f.page));
+            return m;
+        };
+
+        async function dlpAnalyze() {
+            const errBox = dlpEl('dlpError'), rep = dlpEl('dlpReport'), btn = dlpEl('dlpAnalyzeBtn');
+            errBox.classList.add('dlp-hidden'); rep.innerHTML = '';
+            btn.disabled = true;
+            try {
+                const jsonFiles = Array.from(dlpEl('dlpJson').files || []);
+                const pdfFile = (dlpEl('dlpPdf').files || [])[0];
+                if (!jsonFiles.length) throw new Error('اختر ملف JSON واحداً على الأقل.');
+                const parts = [];
+                for (const f of jsonFiles) {
+                    let obj;
+                    try { obj = DlpLib.parseLenient(await f.text()); } catch (e) { throw new Error(`تعذّرت قراءة «${f.name}» كـ JSON: ${e.message}`); }
+                    parts.push({ name: f.name, obj });
+                }
+                parts.sort((a, b) => dlpMinPage(a.obj) - dlpMinPage(b.obj) || a.name.localeCompare(b.name, 'en', { numeric: true }));
+                const merged = parts.length > 1 ? DlpLib.mergeParts(parts.map((p) => p.obj)) : DlpLib.normalizeLecture(parts[0].obj);
+                const res = DlpLib.validateLecturePackage(merged);
+                const st = res.stats || {};
+                let html = `<div class="dlp-box dlp-info">${parts.length > 1 ? 'ترتيب الأجزاء: ' + escapeHtml(parts.map((p) => p.name).join(' ← ')) + '<br>' : ''}الأقسام ${st.sections || 0} · الكتل ${st.blocks || 0} · الأشكال ${st.figures || 0} · الأسئلة ${st.quiz || 0} · المصطلحات ${st.glossary || 0} · الحالات ${st.cases || 0} · الصفحات المغطّاة ${st.pagesCovered || 0}/${st.sourcePages || '؟'}</div>`;
+                if (res.errors.length) html += `<div class="dlp-box dlp-err"><b>أخطاء (${res.errors.length}) تمنع المتابعة:</b>${dlpList(res.errors, 40)}</div>`;
+                if (res.warnings.length) html += `<div class="dlp-box dlp-warn"><b>تحذيرات (${res.warnings.length}):</b>${dlpList(res.warnings, 25)}</div>`;
+                rep.innerHTML = html;
+                if (res.errors.length) return;
+                const figs = merged.figures || [];
+                if (figs.length && !pdfFile) throw new Error('ملف PDF الأصلي مطلوب لقص الأشكال.');
+                if (pdfFile) {
+                    if (pdfFile.size > 60 * 1024 * 1024) throw new Error('ملف PDF كبير جداً (أكثر من 60 ميغابايت).');
+                    const bytes = new Uint8Array(await pdfFile.arrayBuffer());
+                    Dlp.pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+                    if (merged.lecture.sourcePages && Dlp.pdf.numPages !== merged.lecture.sourcePages) {
+                        rep.insertAdjacentHTML('beforeend', `<div class="dlp-box dlp-warn">عدد صفحات الـ PDF (${Dlp.pdf.numPages}) يخالف sourcePages في JSON (${merged.lecture.sourcePages}).</div>`);
+                    }
+                    const bad = figs.filter((f) => f.page > Dlp.pdf.numPages);
+                    if (bad.length) throw new Error('أشكال تشير إلى صفحات غير موجودة في الـ PDF: ' + bad.map((f) => f.id).join('، '));
+                }
+                Dlp.pkg = merged; Dlp.idx = 0; Dlp.reviewed = new Set(); Dlp.pages.clear();
+                if (!dlpEl('dlpName').value.trim()) dlpEl('dlpName').value = merged.lecture.titleAr;
+                const next = figs.length ? 'التالي: مراجعة حدود الأشكال (' + figs.length + ')' : 'التالي: الرفع';
+                rep.insertAdjacentHTML('beforeend', `<div class="dlp-acts"><button type="button" class="dlp-btn ok grow" onclick="${figs.length ? 'dlpShowStep(2)' : 'dlpToUpload()'}">${next}</button></div>`);
+            } catch (e) {
+                errBox.textContent = e.message || String(e); errBox.classList.remove('dlp-hidden');
+            } finally { btn.disabled = false; }
+        }
+
+        // صفحة PDF كلوحة رسم بأبعادها الأصلية: صفحة من صورة واحدة كبيرة تُعرض بأبعاد الصورة نفسها (دون تمدد)، وغيرها بدقة 2x
+        async function dlpPageCanvas(pageNo) {
+            if (Dlp.pages.has(pageNo)) { const c = Dlp.pages.get(pageNo); Dlp.pages.delete(pageNo); Dlp.pages.set(pageNo, c); return c; }
+            const page = await Dlp.pdf.getPage(pageNo);
+            const vp = page.getViewport({ scale: 1 });
+            let natural = null;
+            try {
+                const ops = await page.getOperatorList(), O = pdfjsLib.OPS, imgs = [];
+                ops.fnArray.forEach((fn, i) => { if (fn === O.paintImageXObject || fn === O.paintJpegXObject) { const a = ops.argsArray[i]; if (a && a[1] && a[2]) imgs.push({ w: a[1], h: a[2] }); } });
+                const big = imgs.filter((m) => m.w >= 600 && m.h >= 600);
+                const other = imgs.filter((m) => m.w >= 100 && m.h >= 100 && !(m.w >= 600 && m.h >= 600));
+                if (big.length === 1 && !other.length) natural = big[0];
+            } catch (_) { /* نرجع للعرض العادي */ }
+            const W = natural ? natural.w : Math.round(vp.width * 2), H = natural ? natural.h : Math.round(vp.height * 2);
+            const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
+            const ctx = canvas.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+            await page.render({ canvasContext: ctx, viewport: vp, transform: [W / vp.width, 0, 0, H / vp.height, 0, 0] }).promise;
+            Dlp.pages.set(pageNo, canvas);
+            while (Dlp.pages.size > 4) Dlp.pages.delete(Dlp.pages.keys().next().value);
+            return canvas;
+        }
+        function dlpCropCanvas(pc, box, maxW) {
+            const [y0, x0, y1, x1] = box || [0, 0, 1000, 1000];
+            const W = pc.width, H = pc.height;
+            const sx = Math.round(x0 / 1000 * W), sy = Math.round(y0 / 1000 * H);
+            const sw = Math.max(1, Math.round((x1 - x0) / 1000 * W)), sh = Math.max(1, Math.round((y1 - y0) / 1000 * H));
+            const k = sw > maxW ? maxW / sw : 1;
+            const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(sw * k)); c.height = Math.max(1, Math.round(sh * k));
+            const ctx = c.getContext('2d'); ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(pc, sx, sy, sw, sh, 0, 0, c.width, c.height);
+            return c;
+        }
+        async function dlpDraw() {
+            const figs = (Dlp.pkg && Dlp.pkg.figures) || []; if (!figs.length) return;
+            const my = ++Dlp.token, f = figs[Dlp.idx];
+            dlpSet('dlpFigHead', `الشكل ${Dlp.idx + 1} من ${figs.length}${Dlp.reviewed.has(f.id) ? '  ✓ مراجَع' : ''}`);
+            dlpSet('dlpFigSub', `${f.id} · ص ${f.page} · ${f.caption || ''}${f.box ? ' · [' + f.box.join(', ') + ']' : ' · صفحة كاملة'}`);
+            dlpEl('dlpApproveBtn').textContent = Dlp.idx === figs.length - 1 ? 'اعتماد' : 'اعتماد والتالي';
+            dlpSet('dlpReviewCount', `تمت مراجعة ${Dlp.reviewed.size} من ${figs.length}. يمكنك المتابعة إلى الرفع قبل مراجعة الكل، لكن الأشكال غير المراجَعة تبقى بحدود AI Studio.`);
+            try {
+                const pc = await dlpPageCanvas(f.page);
+                if (my !== Dlp.token) return;
+                const cc = dlpCropCanvas(pc, f.box, 1000);
+                const cv = dlpEl('dlpCrop'); cv.width = cc.width; cv.height = cc.height; cv.getContext('2d').drawImage(cc, 0, 0);
+                const pv = dlpEl('dlpPageView'), k = 340 / pc.width; pv.width = 340; pv.height = Math.round(pc.height * k);
+                const pctx = pv.getContext('2d'); pctx.drawImage(pc, 0, 0, pv.width, pv.height);
+                const b = f.box || [0, 0, 1000, 1000]; pctx.strokeStyle = '#e11d48'; pctx.lineWidth = 2;
+                pctx.strokeRect(b[1] / 1000 * pv.width, b[0] / 1000 * pv.height, (b[3] - b[1]) / 1000 * pv.width, (b[2] - b[0]) / 1000 * pv.height);
+            } catch (e) { dlpSet('dlpFigSub', 'تعذّر عرض الشكل: ' + (e.message || e)); }
+        }
+        function dlpSetStep(s) { Dlp.step = s; document.querySelectorAll('.dlp-steps button[data-s]').forEach((b) => b.classList.toggle('on', Number(b.dataset.s) === s)); }
+        function dlpNudge(edge, dir) {
+            const f = Dlp.pkg.figures[Dlp.idx]; if (!f.box) f.box = [0, 0, 1000, 1000];
+            let [y0, x0, y1, x1] = f.box; const s = Dlp.step;
+            if (edge === 't') y0 += dir > 0 ? -s : s;
+            if (edge === 'b') y1 += dir > 0 ? s : -s;
+            if (edge === 'l') x0 += dir > 0 ? -s : s;
+            if (edge === 'r') x1 += dir > 0 ? s : -s;
+            y0 = Math.max(0, Math.min(y0, y1 - 20)); x0 = Math.max(0, Math.min(x0, x1 - 20));
+            y1 = Math.min(1000, Math.max(y1, y0 + 20)); x1 = Math.min(1000, Math.max(x1, x0 + 20));
+            f.box = [y0, x0, y1, x1]; Dlp.reviewed.delete(f.id);
+            dlpDraw();
+        }
+        function dlpGo(d) { const n = Dlp.pkg.figures.length; Dlp.idx = Math.max(0, Math.min(n - 1, Dlp.idx + d)); dlpDraw(); }
+        function dlpApprove() { const f = Dlp.pkg.figures[Dlp.idx]; Dlp.reviewed.add(f.id); if (Dlp.idx < Dlp.pkg.figures.length - 1) Dlp.idx++; dlpDraw(); }
+
+        function dlpProgress(pct, text) { dlpEl('dlpUpBar').style.width = Math.max(0, Math.min(100, pct)) + '%'; if (text) dlpSet('dlpUpText', text); }
+        function dlpToUpload() { dlpShowStep(3); dlpBuildAndUpload(); }
+        async function dlpBuildAndUpload() {
+            if (Dlp.busy) return; Dlp.busy = true;
+            const upErr = dlpEl('dlpUpError'); upErr.classList.add('dlp-hidden'); dlpEl('dlpUpBack').classList.add('dlp-hidden');
+            try {
+                requireReady();
+                const c = findCourse(Dlp.courseId); if (!c) throw new Error('المقرر غير موجود.');
+                const pkg = JSON.parse(JSON.stringify(Dlp.pkg)), figs = pkg.figures || [];
+                const title = dlpEl('dlpName').value.trim() || pkg.lecture.titleAr;
+                dlpProgress(2, 'جارٍ قص الأشكال...');
+                const blobs = []; let off = 0;
+                for (let i = 0; i < figs.length; i++) {
+                    dlpProgress(2 + Math.round(i / Math.max(1, figs.length) * 38), `قص الشكل ${i + 1} من ${figs.length}...`);
+                    const cc = dlpCropCanvas(await dlpPageCanvas(figs[i].page), figs[i].box, 900);
+                    const blob = await new Promise((r) => cc.toBlob(r, 'image/webp', 0.78));
+                    if (!blob) throw new Error('تعذّر ترميز صورة الشكل ' + figs[i].id);
+                    const data = new Uint8Array(await blob.arrayBuffer());
+                    figs[i].image = { offset: off, length: data.length, mime: blob.type || 'image/webp', w: cc.width, h: cc.height };
+                    blobs.push(data); off += data.length;
+                }
+                const head = new TextEncoder().encode(JSON.stringify(pkg));
+                const out = new Uint8Array(8 + head.length + off);
+                out.set([68, 76, 80, 49], 0); new DataView(out.buffer).setUint32(4, head.length, true); out.set(head, 8);
+                let p = 8 + head.length; for (const b of blobs) { out.set(b, p); p += b.length; }
+                const st = DlpLib.validateLecturePackage(Dlp.pkg).stats;
+                const meta = { sections: st.sections, figures: st.figures, quiz: st.quiz, glossary: st.glossary, cases: st.cases, pages: pkg.lecture.sourcePages };
+                dlpProgress(42, 'جارٍ التشفير والرفع...');
+                await uploadLecture(c, {
+                    title, type: dlpEl('dlpType').value, free: dlpEl('dlpFree').checked, hidden: dlpEl('dlpHide').checked,
+                    prepared: { bytes: out, meta }, onProgress: (pct, text) => dlpProgress(42 + pct * 0.58, text)
+                }, Dlp.replacing);
+                dlpProgress(100, 'تم الرفع.');
+                Dlp.busy = false; dlpClose(); renderCourses();
+            } catch (e) {
+                Dlp.busy = false;
+                upErr.textContent = e.message || String(e); upErr.classList.remove('dlp-hidden'); dlpEl('dlpUpBack').classList.remove('dlp-hidden');
+            }
         }
 
         // ---------- الإعدادات: اختبار ونشر ----------
